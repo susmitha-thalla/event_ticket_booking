@@ -26,4 +26,20 @@ public class EventController {
     public List<Event> getAllEvents() {
         return eventService.getAllEvents();
     }
+    @GetMapping("/category/{category}")
+    public List<Event> getByCategory(@PathVariable String category) {
+        return eventService.getByCategory(category);
+    }
+
+    @GetMapping("/location/{location}")
+    public List<Event> getByLocation(@PathVariable String location) {
+        return eventService.getByLocation(location);
+    }
+
+    @GetMapping("/filter")
+    public List<Event> filter(
+            @RequestParam String category,
+            @RequestParam String location) {
+        return eventService.getByCategoryAndLocation(category, location);
+    }
 }

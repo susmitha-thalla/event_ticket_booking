@@ -49,4 +49,15 @@ public class EventService {
     public List<Event> getAllEvents() {
         return eventRepository.findAll();
     }
+    public List<Event> getByCategory(String category) {
+        return eventRepository.findByCategory(category);
+    }
+
+    public List<Event> getByLocation(String location) {
+        return eventRepository.findByLocation(location);
+    }
+
+    public List<Event> getByCategoryAndLocation(String category, String location) {
+        return eventRepository.findByCategoryAndLocation(category, location);
+    }
 }

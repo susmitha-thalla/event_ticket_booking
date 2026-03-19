@@ -21,6 +21,7 @@ public class Event {
     private Integer availableSeats;
 
     private String createdBy; // organizer email
+    private String category; // MUSIC, TECH, SPORTS etc
 
     // Getters & Setters
 
@@ -82,5 +83,12 @@ public class Event {
 
     public void setCreatedBy(String createdBy) {
         this.createdBy = createdBy;
+    }
+    public String getCategory() {
+        return category;
+    }
+
+    public void setCategory(String category) {
+        this.category = category;
     }
 }

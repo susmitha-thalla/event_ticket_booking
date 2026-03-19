@@ -52,6 +52,6 @@ public class UserService {
             return "Invalid password";
         }
 
-        return "Login Successful";
+        return "Login Successful:"+ user.getRole();
     }
 }
