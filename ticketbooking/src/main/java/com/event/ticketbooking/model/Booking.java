@@ -15,21 +15,23 @@ public class Booking {
 
     private Double totalAmount;
 
+    @Column(name = "qr_code")
     private String qrCode;
 
     private LocalDateTime bookingTime;
 
-    // 🔗 Many bookings → One user
     @ManyToOne
     @JoinColumn(name = "user_id")
     private User user;
 
-    // 🔗 Many bookings → One event
     @ManyToOne
     @JoinColumn(name = "event_id")
     private Event event;
 
-    public Booking() {}
+    @PrePersist
+    public void setBookingTimeAutomatically() {
+        this.bookingTime = LocalDateTime.now();
+    }
 
     // getters & setters
     public Long getBookingId() { return bookingId; }
@@ -51,4 +53,5 @@ public class Booking {
 
     public Event getEvent() { return event; }
     public void setEvent(Event event) { this.event = event; }
+
 }
