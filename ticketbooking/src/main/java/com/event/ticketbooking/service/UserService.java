@@ -1,7 +1,6 @@
 package com.event.ticketbooking.service;
 
 import com.event.ticketbooking.dto.LoginRequest;
-import com.event.ticketbooking.dto.RegisterRequest;
 import com.event.ticketbooking.dto.LoginResponse;
 import com.event.ticketbooking.dto.RegisterRequest;
 import com.event.ticketbooking.model.User;
@@ -14,19 +13,18 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import com.event.ticketbooking.security.JwtUtil;
-
 @Service
 public class UserService {
 
     @Autowired
     private UserRepository userRepository;
 
-    private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
     @Autowired
     private JwtUtil jwtUtil;
 
-    // REGISTER USER / ORGANIZER
+    private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
+
+    // REGISTER USER / ORGANIZER / ADMIN
     public String registerUser(RegisterRequest request) {
 
         // Check if email already exists
@@ -40,12 +38,14 @@ public class UserService {
         user.setPasswordHash(encoder.encode(request.getPassword())); // encrypted password
         user.setPhone(request.getPhone());
 
-        // Allow only USER or ORGANIZER
+        // Allow USER, ORGANIZER, ADMIN
         String role;
         if (request.getRole() == null || request.getRole().trim().isEmpty()) {
             role = "USER";
         } else if (request.getRole().equalsIgnoreCase("ORGANIZER")) {
             role = "ORGANIZER";
+        } else if (request.getRole().equalsIgnoreCase("ADMIN")) {
+            role = "ADMIN";
         } else {
             role = "USER";
         }
@@ -59,12 +59,14 @@ public class UserService {
 
         if (role.equals("ORGANIZER")) {
             return "Organizer Registered Successfully";
+        } else if (role.equals("ADMIN")) {
+            return "Admin Registered Successfully";
         } else {
             return "User Registered Successfully";
         }
     }
 
-    // LOGIN USER / ORGANIZER
+    // LOGIN USER / ORGANIZER / ADMIN
     public LoginResponse loginUser(LoginRequest request) {
 
         User user = userRepository.findByEmail(request.getEmail())
@@ -76,7 +78,12 @@ public class UserService {
 
         String token = jwtUtil.generateToken(user.getEmail());
 
-        return new LoginResponse("Login Successful", token, user.getRole(), user.getEmail());
+        return new LoginResponse(
+                "Login Successful",
+                token,
+                user.getRole(),
+                user.getEmail()
+        );
     }
 
     public List<User> getAllUsers() {

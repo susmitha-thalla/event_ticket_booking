@@ -26,15 +26,17 @@ public class BookingService {
 
     @Autowired
     private UserRepository userRepository;
+    @Autowired
+    private QrService qrService;
 
-    public String bookTicket(BookingRequest request, Principal principal) {
+    public Booking bookTicket(BookingRequest request, Principal principal){
 
         String email = principal.getName();
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        if (!"USER".equals(user.getRole())) {
+        if (!"USER".equals(user.getRole()) && !"ROLE_USER".equals(user.getRole())) {
             return "Only users can book tickets!";
         }
 
@@ -55,7 +57,8 @@ public class BookingService {
 
         double totalAmount = event.getPrice() * request.getQuantity();
         String qr = UUID.randomUUID().toString();
-
+        String qrImagePath = qrService.generateQrImage(qr);
+        System.out.println("Generated QR image path: " + qrImagePath);
         event.setAvailableSeats(event.getAvailableSeats() - request.getQuantity());
         eventRepository.save(event);
 
@@ -65,15 +68,17 @@ public class BookingService {
         booking.setQuantity(request.getQuantity());
         booking.setTotalAmount(totalAmount);
         booking.setQrCode(qr);
+        booking.setQrImagePath(qrImagePath);
         booking.setPaymentMode(request.getPaymentMode());
         booking.setPaymentStatus("SUCCESS");
         booking.setSeatNumbers(request.getSeatNumbers());
         booking.setGender(request.getGender());
         booking.setBookingTime(LocalDateTime.now());
 
-        bookingRepository.save(booking);
+      //  bookingRepository.save(booking);
 
-        return "Booking Successful. QR: " + qr;
+        Booking savedBooking = bookingRepository.save(booking);
+        return savedBooking;
     }
 
     public List<Booking> getUserBookings(Principal principal) {
@@ -82,5 +87,9 @@ public class BookingService {
 
     public List<Booking> getOrganizerBookings(Principal principal) {
         return bookingRepository.findByEvent_CreatedBy(principal.getName());
+    }
+
+    public List<Booking> getAllBookings() {
+        return bookingRepository.findAll();
     }
 }

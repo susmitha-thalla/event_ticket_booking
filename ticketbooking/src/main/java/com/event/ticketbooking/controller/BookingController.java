@@ -11,13 +11,14 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/bookings")
+@CrossOrigin
 public class BookingController {
 
     @Autowired
     private BookingService bookingService;
 
     @PostMapping("/book")
-    public String bookTicket(@RequestBody BookingRequest request, Principal principal) {
+    public Booking bookTicket(@RequestBody BookingRequest request, Principal principal) {
         return bookingService.bookTicket(request, principal);
     }
 
@@ -29,5 +30,10 @@ public class BookingController {
     @GetMapping("/organizer-bookings")
     public List<Booking> getOrganizerBookings(Principal principal) {
         return bookingService.getOrganizerBookings(principal);
+    }
+
+    @GetMapping("/all")
+    public List<Booking> getAllBookings() {
+        return bookingService.getAllBookings();
     }
 }

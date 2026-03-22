@@ -72,6 +72,9 @@ public class EventService {
     public List<Event> getOrganizerEvents(Principal principal) {
         return eventRepository.findByCreatedBy(principal.getName());
     }
+    public List<Event> getAllEventsForAdmin() {
+        return eventRepository.findAll();
+    }
 
     public String approveEvent(Long eventId) {
         Event event = eventRepository.findById(eventId)

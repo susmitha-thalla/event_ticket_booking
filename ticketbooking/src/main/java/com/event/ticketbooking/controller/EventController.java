@@ -56,4 +56,8 @@ public class EventController {
     public List<Event> getByDate(@RequestParam String start, @RequestParam String end) {
         return eventService.getByDateRange(LocalDateTime.parse(start), LocalDateTime.parse(end));
     }
+    @GetMapping("/admin/all")
+    public List<Event> getAllEventsForAdmin() {
+        return eventService.getAllEventsForAdmin();
+    }
 }

@@ -3,6 +3,7 @@ package com.event.ticketbooking.model;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
+
 @Entity
 @Table(name = "bookings")
 public class Booking {
@@ -19,6 +20,10 @@ public class Booking {
     private String seatNumbers;
     private String gender;
     private LocalDateTime bookingTime;
+
+
+
+    private String qrImagePath;
 
     @ManyToOne
     @JoinColumn(name = "user_id")
@@ -117,5 +122,12 @@ public class Booking {
 
     public void setEvent(Event event) {
         this.event = event;
+    }
+    public String getQrImagePath() {
+        return qrImagePath;
+    }
+
+    public void setQrImagePath(String qrImagePath) {
+        this.qrImagePath = qrImagePath;
     }
 }
