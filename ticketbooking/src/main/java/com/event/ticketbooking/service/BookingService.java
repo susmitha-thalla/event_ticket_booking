@@ -26,10 +26,11 @@ public class BookingService {
 
     @Autowired
     private UserRepository userRepository;
+
     @Autowired
     private QrService qrService;
 
-    public Booking bookTicket(BookingRequest request, Principal principal){
+    public Booking bookTicket(BookingRequest request, Principal principal) {
 
         String email = principal.getName();
 
@@ -37,28 +38,30 @@ public class BookingService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         if (!"USER".equals(user.getRole()) && !"ROLE_USER".equals(user.getRole())) {
-            return "Only users can book tickets!";
+            throw new RuntimeException("Only users can book tickets!");
         }
 
         Event event = eventRepository.findById(request.getEventId())
                 .orElseThrow(() -> new RuntimeException("Event not found"));
 
         if (!"APPROVED".equals(event.getApprovalStatus())) {
-            return "Only approved events can be booked";
+            throw new RuntimeException("Only approved events can be booked");
         }
 
         if (request.getQuantity() == null || request.getQuantity() <= 0) {
-            return "Quantity must be greater than 0";
+            throw new RuntimeException("Quantity must be greater than 0");
         }
 
         if (event.getAvailableSeats() < request.getQuantity()) {
-            return "Not enough seats available!";
+            throw new RuntimeException("Not enough seats available!");
         }
 
         double totalAmount = event.getPrice() * request.getQuantity();
         String qr = UUID.randomUUID().toString();
         String qrImagePath = qrService.generateQrImage(qr);
+
         System.out.println("Generated QR image path: " + qrImagePath);
+
         event.setAvailableSeats(event.getAvailableSeats() - request.getQuantity());
         eventRepository.save(event);
 
@@ -75,10 +78,7 @@ public class BookingService {
         booking.setGender(request.getGender());
         booking.setBookingTime(LocalDateTime.now());
 
-      //  bookingRepository.save(booking);
-
-        Booking savedBooking = bookingRepository.save(booking);
-        return savedBooking;
+        return bookingRepository.save(booking);
     }
 
     public List<Booking> getUserBookings(Principal principal) {

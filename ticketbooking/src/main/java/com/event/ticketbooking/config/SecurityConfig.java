@@ -39,6 +39,7 @@ public class SecurityConfig {
 
                         .requestMatchers("/api/users/all").authenticated()
                         .requestMatchers("/generated_qr/**").permitAll()
+
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session ->
