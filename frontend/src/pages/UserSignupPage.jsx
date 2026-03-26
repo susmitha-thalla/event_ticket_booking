@@ -23,11 +23,13 @@ function UserSignupPage() {
     e.preventDefault();
     try {
       const response = await registerUser(form);
-      setMessage(response);
+setMessage(typeof response === "string" ? response : "Signup successful");
     } catch (error) {
-      console.error(error);
-      setErrorMsg(error.response?.data || "Signup failed");
-    }
+  console.error(error);
+  setErrorMsg(
+    error.response?.data || error.message || "Signup failed"
+  );
+}
   };
 
   return (

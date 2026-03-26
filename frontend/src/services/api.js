@@ -1,14 +1,28 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "http://localhost:8080/api",
+  baseURL: import.meta.env.VITE_API_BASE_URL,
 });
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
-  if (token) {
+
+  const publicUrls = [
+    "/users/register",
+    "/users/login",
+    "/events/all",
+    "/events/category/",
+    "/events/location/",
+    "/events/filter",
+    "/events/date",
+  ];
+
+  const isPublic = publicUrls.some((url) => config.url?.includes(url));
+
+  if (token && !isPublic) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
   return config;
 });
 
