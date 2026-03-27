@@ -6,32 +6,27 @@ import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.QRCodeWriter;
 import org.springframework.stereotype.Service;
 
-import java.io.File;
-import java.nio.file.FileSystems;
-import java.nio.file.Path;
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.util.Base64;
 
 @Service
 public class QrService {
 
     public String generateQrImage(String qrText) {
         try {
-            String folderName = "generated_qr";
-            File folder = new File(folderName);
-
-            if (!folder.exists()) {
-                folder.mkdirs();
-            }
-
-            String fileName = "qr_" + qrText + ".png";
-            String filePath = folderName + "/" + fileName;
-
             QRCodeWriter qrCodeWriter = new QRCodeWriter();
             BitMatrix bitMatrix = qrCodeWriter.encode(qrText, BarcodeFormat.QR_CODE, 250, 250);
 
-            Path path = FileSystems.getDefault().getPath(filePath);
-            MatrixToImageWriter.writeToPath(bitMatrix, "PNG", path);
+            BufferedImage bufferedImage = MatrixToImageWriter.toBufferedImage(bitMatrix);
 
-            return "/qr/" + fileName;
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            ImageIO.write(bufferedImage, "PNG", outputStream);
+
+            String base64Image = Base64.getEncoder().encodeToString(outputStream.toByteArray());
+
+            return "data:image/png;base64," + base64Image;
 
         } catch (Exception e) {
             throw new RuntimeException("Failed to generate QR image: " + e.getMessage());
