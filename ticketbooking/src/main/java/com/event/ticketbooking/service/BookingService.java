@@ -31,20 +31,19 @@ public class BookingService {
     private QrService qrService;
 
     public Booking bookTicket(BookingRequest request, Principal principal) {
-
         String email = principal.getName();
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        if (!"USER".equals(user.getRole()) && !"ROLE_USER".equals(user.getRole())) {
+        if (!"USER".equalsIgnoreCase(user.getRole()) && !"ROLE_USER".equalsIgnoreCase(user.getRole())) {
             throw new RuntimeException("Only users can book tickets!");
         }
 
         Event event = eventRepository.findById(request.getEventId())
                 .orElseThrow(() -> new RuntimeException("Event not found"));
 
-        if (!"APPROVED".equals(event.getApprovalStatus())) {
+        if (!"APPROVED".equalsIgnoreCase(event.getApprovalStatus())) {
             throw new RuntimeException("Only approved events can be booked");
         }
 
@@ -57,10 +56,8 @@ public class BookingService {
         }
 
         double totalAmount = event.getPrice() * request.getQuantity();
-        String qr = UUID.randomUUID().toString();
-        String qrImagePath = qrService.generateQrImage(qr);
-
-        System.out.println("Generated QR image path: " + qrImagePath);
+        String qrText = "BOOKING-" + UUID.randomUUID();
+        String qrImage = qrService.generateQrImage(qrText);
 
         event.setAvailableSeats(event.getAvailableSeats() - request.getQuantity());
         eventRepository.save(event);
@@ -70,8 +67,8 @@ public class BookingService {
         booking.setEvent(event);
         booking.setQuantity(request.getQuantity());
         booking.setTotalAmount(totalAmount);
-        booking.setQrCode(qr);
-        booking.setQrImagePath(qrImagePath);
+        booking.setQrCode(qrText);
+        booking.setQrImagePath(qrImage);
         booking.setPaymentMode(request.getPaymentMode());
         booking.setPaymentStatus("SUCCESS");
         booking.setSeatNumbers(request.getSeatNumbers());
