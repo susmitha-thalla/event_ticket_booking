@@ -38,15 +38,15 @@ function BookingSuccessPage() {
           <div className="qr-box">
             <p><strong>Your QR Ticket</strong></p>
 
-            {booking.qrImagePath ? (
-              <img
-                src={`http://localhost:8080/${booking.qrImagePath.replace(/\\/g, "/")}`}
-                alt="QR Ticket"
-                className="qr-image"
-              />
-            ) : (
-              <p>QR image not available</p>
-            )}
+            {booking.qrImagePath && booking.qrImagePath.startsWith("data:image") ? (
+  <img
+    src={booking.qrImagePath}
+    alt="QR Ticket"
+    style={{ width: "220px", height: "220px", marginTop: "10px" }}
+  />
+) : (
+  <p>QR image not available</p>
+)}
           </div>
 
           <button onClick={() => navigate("/my-bookings")}>

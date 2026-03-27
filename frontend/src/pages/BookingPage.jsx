@@ -101,13 +101,19 @@ function BookingPage() {
               required
             />
 
-            <input
+            <select
               name="gender"
               placeholder="Gender"
               value={form.gender}
               onChange={handleChange}
               required
-            />
+              >
+              <option value="">Select Gender</option>
+              <option value="UPI">Female</option>
+              <option value="CARD">Male</option>
+              <option value="CARD">Other</option>
+              </select>
+          
 
             <select
               name="paymentMode"
