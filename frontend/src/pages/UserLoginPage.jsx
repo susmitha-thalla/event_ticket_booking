@@ -24,7 +24,7 @@ function UserLoginPage() {
       if (response.role === "USER" || response.role === "ROLE_USER") {
         navigate("/events");
       } else {
-        setErrorMsg("This account is not a user account.");
+        setErrorMsg("❌This account is not a user account.");
       }
     } catch (error) {
       console.error(error);

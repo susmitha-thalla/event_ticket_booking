@@ -9,6 +9,7 @@ function MyBookingsPage() {
     const loadBookings = async () => {
       try {
         const data = await getMyBookings();
+        console.log("Bookings data:", data);
         setBookings(data);
       } catch (error) {
         console.error(error);
@@ -36,39 +37,52 @@ function MyBookingsPage() {
             <p>Your booked tickets will appear here.</p>
           </div>
         ) : (
-          bookings.map((booking) => (
-            <div className="card" key={booking.bookingId}>
-              <div className="card-title">Booking #{booking.bookingId}</div>
+          bookings.map((booking) => {
+            const hasValidQr =
+              booking.qrImagePath &&
+              typeof booking.qrImagePath === "string" &&
+              booking.qrImagePath.startsWith("data:image");
 
-              <div className="info-row"><strong>Quantity:</strong> {booking.quantity}</div>
-              <div className="info-row"><strong>Total Amount:</strong> ₹{booking.totalAmount}</div>
-              <div className="info-row"><strong>Payment Mode:</strong> {booking.paymentMode}</div>
-              <div className="info-row"><strong>Payment Status:</strong> {booking.paymentStatus}</div>
-              <div className="info-row"><strong>Seat Numbers:</strong> {booking.seatNumbers}</div>
-              <div className="info-row"><strong>Gender:</strong> {booking.gender}</div>
-              <div className="info-row"><strong>QR Code:</strong> {booking.qrCode}</div>
+            return (
+              <div className="card" key={booking.bookingId}>
+                <div className="card-title">Booking #{booking.bookingId}</div>
 
-              <div className="qr-box">
-                <strong>QR Ticket Image</strong>
+                <div className="info-row">
+                  <strong>Quantity:</strong> {booking.quantity}
+                </div>
+                <div className="info-row">
+                  <strong>Total Amount:</strong> ₹{booking.totalAmount}
+                </div>
+                <div className="info-row">
+                  <strong>Payment Mode:</strong> {booking.paymentMode}
+                </div>
+                <div className="info-row">
+                  <strong>Payment Status:</strong> {booking.paymentStatus}
+                </div>
+                <div className="info-row">
+                  <strong>Seat Numbers:</strong> {booking.seatNumbers}
+                </div>
+                <div className="info-row">
+                  <strong>Gender:</strong> {booking.gender}
+                </div>
 
-                {booking.qrImagePath ? (
-                  <>
-                    <p style={{ marginTop: "8px" }}>
-                      <strong>Path:</strong> {booking.qrImagePath}
-                    </p>
+                <div className="qr-box">
+                  <strong>QR Ticket Image</strong>
 
+                  {hasValidQr ? (
                     <img
-                      src={`http://localhost:8080/${booking.qrImagePath.replace(/\\/g, "/")}`}
+                      src={booking.qrImagePath}
                       alt="QR Code"
                       className="qr-image"
+                      style={{ width: "220px", height: "220px", marginTop: "10px" }}
                     />
-                  </>
-                ) : (
-                  <p style={{ marginTop: "10px" }}>QR image not available.</p>
-                )}
+                  ) : (
+                    <p style={{ marginTop: "10px" }}>QR image not available.</p>
+                  )}
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </>

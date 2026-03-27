@@ -12,7 +12,7 @@ function OrganizerBookingsPage() {
         setBookings(data);
       } catch (error) {
         console.error(error);
-        alert("Failed to load organizer bookings");
+        alert("😞Failed to load organizer bookings");
       }
     };
 

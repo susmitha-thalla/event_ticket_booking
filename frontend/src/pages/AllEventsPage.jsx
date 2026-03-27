@@ -26,7 +26,7 @@ function AllEventsPage() {
       loadEvents();
     } catch (error) {
       console.error(error);
-      alert("Approval failed");
+      alert("Approval failed❌");
     }
   };
 
