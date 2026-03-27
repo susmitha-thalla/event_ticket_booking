@@ -57,9 +57,8 @@ public class BookingService {
         }
 
         double totalAmount = event.getPrice() * request.getQuantity();
-
-        String qrText = "Booking-" + UUID.randomUUID();
-        String qrImagePath = qrService.generateQrImage(qrText);
+        String qr = UUID.randomUUID().toString();
+        String qrImagePath = qrService.generateQrImage(qr);
 
         System.out.println("Generated QR image path: " + qrImagePath);
 
@@ -71,7 +70,7 @@ public class BookingService {
         booking.setEvent(event);
         booking.setQuantity(request.getQuantity());
         booking.setTotalAmount(totalAmount);
-        booking.setQrCode(qrText);
+        booking.setQrCode(qr);
         booking.setQrImagePath(qrImagePath);
         booking.setPaymentMode(request.getPaymentMode());
         booking.setPaymentStatus("SUCCESS");
@@ -79,11 +78,7 @@ public class BookingService {
         booking.setGender(request.getGender());
         booking.setBookingTime(LocalDateTime.now());
 
-        Booking savedBooking = bookingRepository.save(booking);
-
-        System.out.println("Saved booking QR image path: " + savedBooking.getQrImagePath());
-
-        return savedBooking;
+        return bookingRepository.save(booking);
     }
 
     public List<Booking> getUserBookings(Principal principal) {
