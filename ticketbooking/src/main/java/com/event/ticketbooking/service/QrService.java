@@ -31,7 +31,7 @@ public class QrService {
             Path path = FileSystems.getDefault().getPath(filePath);
             MatrixToImageWriter.writeToPath(bitMatrix, "PNG", path);
 
-            return filePath;
+            return "/qr/" + fileName;
 
         } catch (Exception e) {
             throw new RuntimeException("Failed to generate QR image: " + e.getMessage());

@@ -13,7 +13,7 @@ public class WebConfig implements WebMvcConfigurer {
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         String qrPath = new File("generated_qr").getAbsolutePath();
 
-        registry.addResourceHandler("/generated_qr/**")
+        registry.addResourceHandler("/qr/**")
                 .addResourceLocations("file:" + qrPath + "/");
     }
 }
