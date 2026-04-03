@@ -1,6 +1,3 @@
-Here is a **clean, professional, industry-style README** inspired by your reference repo (BookMyShow clone), but tailored specifically to **your project** 👇
-
----
 
 # 🎟️ Online Event Ticket Booking System
 
