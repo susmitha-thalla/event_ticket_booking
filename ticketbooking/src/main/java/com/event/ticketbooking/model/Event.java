@@ -14,9 +14,7 @@ public class Event {
     private String title;
     private String description;
     private String location;
-
     private LocalDateTime eventDate;
-
     private Double price;
     private Integer availableSeats;
 
@@ -25,10 +23,42 @@ public class Event {
     private String approvalStatus; // PENDING / APPROVED
     private Boolean organizerPaid;
 
-    // Getters & Setters
+    // NEW FIELDS FOR UPGRADE
+    private Boolean hasSeats;
+    private String recurrenceType; // NONE / DAILY / WEEKLY / MONTHLY
+    private String eventStatus; // UPCOMING / LIVE / ENDED / DELETED
+    private Boolean isDeleted;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+
+    public Event() {
+    }
+
+    @PrePersist
+    public void prePersist() {
+        LocalDateTime now = LocalDateTime.now();
+        this.createdAt = now;
+        this.updatedAt = now;
+
+        if (this.hasSeats == null) this.hasSeats = false;
+        if (this.recurrenceType == null) this.recurrenceType = "NONE";
+        if (this.eventStatus == null) this.eventStatus = "UPCOMING";
+        if (this.isDeleted == null) this.isDeleted = false;
+        if (this.approvalStatus == null) this.approvalStatus = "PENDING";
+        if (this.organizerPaid == null) this.organizerPaid = false;
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
 
     public Long getEventId() {
         return eventId;
+    }
+
+    public void setEventId(Long eventId) {
+        this.eventId = eventId;
     }
 
     public String getTitle() {
@@ -49,12 +79,6 @@ public class Event {
 
     public String getLocation() {
         return location;
-    }
-    public String getApprovalStatus() {
-        return approvalStatus;
-    }
-    public Boolean getOrganizerPaid() {
-        return organizerPaid;
     }
 
     public void setLocation(String location) {
@@ -92,6 +116,7 @@ public class Event {
     public void setCreatedBy(String createdBy) {
         this.createdBy = createdBy;
     }
+
     public String getCategory() {
         return category;
     }
@@ -99,11 +124,60 @@ public class Event {
     public void setCategory(String category) {
         this.category = category;
     }
+
+    public String getApprovalStatus() {
+        return approvalStatus;
+    }
+
     public void setApprovalStatus(String approvalStatus) {
         this.approvalStatus = approvalStatus;
     }
 
+    public Boolean getOrganizerPaid() {
+        return organizerPaid;
+    }
+
     public void setOrganizerPaid(Boolean organizerPaid) {
         this.organizerPaid = organizerPaid;
+    }
+
+    public Boolean getHasSeats() {
+        return hasSeats;
+    }
+
+    public void setHasSeats(Boolean hasSeats) {
+        this.hasSeats = hasSeats;
+    }
+
+    public String getRecurrenceType() {
+        return recurrenceType;
+    }
+
+    public void setRecurrenceType(String recurrenceType) {
+        this.recurrenceType = recurrenceType;
+    }
+
+    public String getEventStatus() {
+        return eventStatus;
+    }
+
+    public void setEventStatus(String eventStatus) {
+        this.eventStatus = eventStatus;
+    }
+
+    public Boolean getIsDeleted() {
+        return isDeleted;
+    }
+
+    public void setIsDeleted(Boolean deleted) {
+        isDeleted = deleted;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
     }
 }

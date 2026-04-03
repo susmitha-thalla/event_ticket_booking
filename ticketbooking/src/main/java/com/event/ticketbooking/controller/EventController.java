@@ -12,6 +12,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/events")
+@CrossOrigin(origins = "*")
 public class EventController {
 
     @Autowired
@@ -56,8 +57,27 @@ public class EventController {
     public List<Event> getByDate(@RequestParam String start, @RequestParam String end) {
         return eventService.getByDateRange(LocalDateTime.parse(start), LocalDateTime.parse(end));
     }
+
     @GetMapping("/admin/all")
     public List<Event> getAllEventsForAdmin() {
         return eventService.getAllEventsForAdmin();
+    }
+
+    // NEW: live events
+    @GetMapping("/live")
+    public List<Event> getLiveEvents() {
+        return eventService.getLiveEvents();
+    }
+
+    // NEW: events starting within next 2 days
+    @GetMapping("/starting-soon")
+    public List<Event> getStartingSoonEvents() {
+        return eventService.getStartingSoonEvents();
+    }
+
+    // NEW: soft delete event
+    @DeleteMapping("/{eventId}")
+    public String deleteEvent(@PathVariable Long eventId, Principal principal) {
+        return eventService.softDeleteEvent(eventId, principal);
     }
 }

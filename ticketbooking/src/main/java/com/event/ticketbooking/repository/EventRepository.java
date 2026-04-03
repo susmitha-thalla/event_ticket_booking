@@ -5,18 +5,37 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 public interface EventRepository extends JpaRepository<Event, Long> {
 
-    List<Event> findByApprovalStatus(String status);
+    // old logic + ignore deleted events
+    List<Event> findByApprovalStatusAndIsDeletedFalse(String status);
 
-    List<Event> findByCreatedBy(String email);
+    List<Event> findByCreatedByAndIsDeletedFalse(String email);
 
-    List<Event> findByCategoryAndApprovalStatus(String category, String status);
+    List<Event> findByCategoryAndApprovalStatusAndIsDeletedFalse(String category, String status);
 
-    List<Event> findByLocationAndApprovalStatus(String location, String status);
+    List<Event> findByLocationAndApprovalStatusAndIsDeletedFalse(String location, String status);
 
-    List<Event> findByCategoryAndLocationAndApprovalStatus(String category, String location, String status);
+    List<Event> findByCategoryAndLocationAndApprovalStatusAndIsDeletedFalse(
+            String category,
+            String location,
+            String status
+    );
 
-    List<Event> findByEventDateBetweenAndApprovalStatus(LocalDateTime start, LocalDateTime end, String status);
+    List<Event> findByEventDateBetweenAndApprovalStatusAndIsDeletedFalse(
+            LocalDateTime start,
+            LocalDateTime end,
+            String status
+    );
+
+    // new upgrade queries
+    List<Event> findByIsDeletedFalse();
+
+    List<Event> findByEventStatusAndIsDeletedFalse(String eventStatus);
+
+    List<Event> findByEventDateBetweenAndIsDeletedFalse(LocalDateTime start, LocalDateTime end);
+
+    Optional<Event> findByEventIdAndIsDeletedFalse(Long eventId);
 }
