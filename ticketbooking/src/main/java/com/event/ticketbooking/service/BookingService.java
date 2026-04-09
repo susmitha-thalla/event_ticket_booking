@@ -228,9 +228,7 @@ public class BookingService {
         if (event != null && !Boolean.TRUE.equals(event.getIsDeleted())) {
             int restoreCount = booking.getQuantity() != null ? booking.getQuantity() : 0;
             int currentAvailable = event.getAvailableSeats() != null ? event.getAvailableSeats() : 0;
-            int totalSeats = event.getTotalSeats() != null ? event.getTotalSeats() : Integer.MAX_VALUE;
-
-            event.setAvailableSeats(Math.min(currentAvailable + restoreCount, totalSeats));
+            event.setAvailableSeats(currentAvailable + restoreCount);
             eventRepository.save(event);
         }
 
@@ -303,10 +301,26 @@ public class BookingService {
     }
 
     private void refreshEventStatus(Event event) {
-        String newStatus = event.calculateEventStatus();
-        if (!newStatus.equalsIgnoreCase(event.getEventStatus())) {
+        String newStatus = calculateEventStatus(event.getEventDate());
+        if (event.getEventStatus() == null || !newStatus.equalsIgnoreCase(event.getEventStatus())) {
             event.setEventStatus(newStatus);
             eventRepository.save(event);
+        }
+    }
+
+    private String calculateEventStatus(LocalDateTime eventDate) {
+        if (eventDate == null) {
+            return "UPCOMING";
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+
+        if (eventDate.isAfter(now)) {
+            return "UPCOMING";
+        } else if (eventDate.isBefore(now.minusHours(3))) {
+            return "ENDED";
+        } else {
+            return "LIVE";
         }
     }
 
