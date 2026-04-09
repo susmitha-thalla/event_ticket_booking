@@ -32,6 +32,7 @@ public class SecurityConfig {
                         // =========================
                         .requestMatchers("/api/users/register", "/api/users/login").permitAll()
                         .requestMatchers("/generated_qr/**").permitAll()
+                        .requestMatchers("/wallpapers/**").permitAll()
 
                         // =========================
                         // PUBLIC EVENT APIs
@@ -57,6 +58,10 @@ public class SecurityConfig {
                         // =========================
                         .requestMatchers(HttpMethod.POST,
                                 "/api/events/create"
+                        ).authenticated()
+
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/uploads/wallpaper"
                         ).authenticated()
 
                         .requestMatchers(HttpMethod.POST,
