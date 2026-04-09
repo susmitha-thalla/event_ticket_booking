@@ -1,10 +1,15 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  getCompletedEvents,
   getAllEvents,
+  getLiveEvents,
+  getNonSeatBasedEvents,
+  getUpcomingEvents,
   getEventsByCategory,
   getEventsByLocation,
   getEventsByDate,
+  getSeatBasedEvents,
 } from "../services/eventService";
 import Navbar from "../components/Navbar";
 
@@ -24,6 +29,7 @@ function EventsPage() {
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [loading, setLoading] = useState(false);
+  const [activeView, setActiveView] = useState("ALL");
   const navigate = useNavigate();
 
   const loadEvents = async () => {
@@ -82,6 +88,26 @@ function EventsPage() {
     }
   };
 
+  const loadByView = async (view) => {
+    try {
+      setLoading(true);
+      setActiveView(view);
+      let data = [];
+      if (view === "ALL") data = await getAllEvents();
+      if (view === "LIVE") data = await getLiveEvents();
+      if (view === "UPCOMING") data = await getUpcomingEvents();
+      if (view === "COMPLETED") data = await getCompletedEvents();
+      if (view === "SEAT_BASED") data = await getSeatBasedEvents();
+      if (view === "NON_SEAT_BASED") data = await getNonSeatBasedEvents();
+      setEvents(data);
+    } catch (error) {
+      console.error(error);
+      alert("Failed to load selected event view");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <>
       <Navbar />
@@ -95,6 +121,15 @@ function EventsPage() {
 
         <div className="card">
           <h3>Filter Events</h3>
+
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "12px" }}>
+            <button className={activeView === "ALL" ? "" : "secondary"} onClick={() => loadByView("ALL")}>All</button>
+            <button className={activeView === "LIVE" ? "" : "secondary"} onClick={() => loadByView("LIVE")}>Live</button>
+            <button className={activeView === "UPCOMING" ? "" : "secondary"} onClick={() => loadByView("UPCOMING")}>Upcoming</button>
+            <button className={activeView === "COMPLETED" ? "" : "secondary"} onClick={() => loadByView("COMPLETED")}>Completed</button>
+            <button className={activeView === "SEAT_BASED" ? "" : "secondary"} onClick={() => loadByView("SEAT_BASED")}>Seat Based</button>
+            <button className={activeView === "NON_SEAT_BASED" ? "" : "secondary"} onClick={() => loadByView("NON_SEAT_BASED")}>Non-seat</button>
+          </div>
 
           <div className="grid-2">
             <div>
@@ -155,6 +190,19 @@ function EventsPage() {
           ) : events.length > 0 ? (
             events.map((event) => (
               <div className="card" key={event.eventId}>
+                {event.wallpaperUrl ? (
+                  <img
+                    src={event.wallpaperUrl}
+                    alt={`${event.title} wallpaper`}
+                    style={{
+                      width: "100%",
+                      height: "180px",
+                      objectFit: "cover",
+                      borderRadius: "12px",
+                      marginBottom: "12px",
+                    }}
+                  />
+                ) : null}
                 <div className="card-title">{event.title}</div>
                 <p className="subtext">{event.description}</p>
 

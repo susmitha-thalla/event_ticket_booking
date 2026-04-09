@@ -19,7 +19,7 @@ public class EventController {
     private EventService eventService;
 
     @PostMapping("/create")
-    public String createEvent(@RequestBody EventRequest request, Principal principal) {
+    public Event createEvent(@RequestBody EventRequest request, Principal principal) {
         return eventService.createEvent(request, principal);
     }
 

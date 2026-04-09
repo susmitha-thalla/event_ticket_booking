@@ -25,6 +25,8 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
 
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
                         // =========================
                         // PUBLIC AUTH
                         // =========================
@@ -57,6 +59,11 @@ public class SecurityConfig {
                                 "/api/events/create"
                         ).authenticated()
 
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/events/approve/**",
+                                "/api/events/reject/**"
+                        ).authenticated()
+
                         .requestMatchers(HttpMethod.PUT,
                                 "/api/events/*"
                         ).authenticated()
@@ -72,10 +79,13 @@ public class SecurityConfig {
                                 "/api/events/admin/pending"
                         ).authenticated()
 
-                        .requestMatchers(HttpMethod.PUT,
-                                "/api/events/approve/**",
-                                "/api/events/reject/**"
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/seats/layout/**"
                         ).authenticated()
+
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/seats/event/**"
+                        ).permitAll()
 
                         // =========================
                         // BOOKING APIs

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { createEvent } from "../services/eventService";
+import { createSeatLayout } from "../services/seatService";
 
 function CreateEventPage() {
   const navigate = useNavigate();
@@ -10,6 +11,7 @@ function CreateEventPage() {
     description: "",
     location: "",
     category: "",
+    wallpaperUrl: "",
     eventDate: "",
     price: "",
     availableSeats: "",
@@ -55,24 +57,35 @@ function CreateEventPage() {
     }
 
     try {
-      const response = await createEvent({
+      const createdEvent = await createEvent({
         title: form.title,
         description: form.description,
         location: form.location,
         category: form.category,
+        wallpaperUrl: form.wallpaperUrl,
         eventDate: form.eventDate,
         price: Number(form.price),
         availableSeats,
         hasSeats: Boolean(form.hasSeats),
         recurrenceType: form.recurrenceType || "NONE",
       });
-      alert(response);
+
+      if (form.hasSeats && !createdEvent?.eventId) {
+        throw new Error("Event created but eventId was not returned. Please update backend create-event response.");
+      }
+
+      if (form.hasSeats) {
+        await createSeatLayout(createdEvent.eventId, parsedUniqueSeats);
+      }
+
+      alert("Event created successfully and sent for admin approval.");
 
       setForm({
         title: "",
         description: "",
         location: "",
         category: "",
+        wallpaperUrl: "",
         eventDate: "",
         price: "",
         availableSeats: "",
@@ -82,12 +95,24 @@ function CreateEventPage() {
       setSeatLayout("");
     } catch (error) {
       console.error(error);
-      if (error?.response?.status === 401 || error?.response?.status === 403) {
-        alert("Unauthorized. Please login again as organizer.");
+      const status = error?.response?.status;
+      const backendMessage =
+        error?.response?.data?.message ||
+        (typeof error?.response?.data === "string" ? error.response.data : "") ||
+        error.message;
+
+      if (status === 401) {
+        alert(`Session expired (${status}). Please login again as organizer.`);
         navigate("/organizer/login");
         return;
       }
-      alert(error.response?.data || error.message || "Event creation failed");
+
+      if (status === 403) {
+        alert(`Forbidden (${status}): ${backendMessage || "Access denied by backend."}`);
+        return;
+      }
+
+      alert(backendMessage || "Event creation failed");
     }
   };
 
@@ -102,6 +127,24 @@ function CreateEventPage() {
             <input name="description" placeholder="Description" onChange={handleChange} required />
             <input name="location" placeholder="Location" onChange={handleChange} required />
             <input name="category" placeholder="Category" onChange={handleChange} required />
+            <input
+              type="url"
+              name="wallpaperUrl"
+              placeholder="Event Wallpaper URL"
+              value={form.wallpaperUrl}
+              onChange={handleChange}
+              required
+            />
+            {form.wallpaperUrl ? (
+              <img
+                src={form.wallpaperUrl}
+                alt="Event wallpaper preview"
+                style={{ width: "100%", height: "170px", objectFit: "cover", borderRadius: "12px" }}
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
+              />
+            ) : null}
             <input
               type="datetime-local"
               name="eventDate"

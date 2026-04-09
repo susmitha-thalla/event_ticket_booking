@@ -37,6 +37,14 @@ public class JwtFilter extends OncePerRequestFilter {
             if (authHeader != null && authHeader.startsWith("Bearer ")) {
                 token = authHeader.substring(7).trim();
 
+                if (token.startsWith("\"") && token.endsWith("\"") && token.length() > 1) {
+                    token = token.substring(1, token.length() - 1).trim();
+                }
+
+                if (token.toLowerCase().startsWith("bearer ")) {
+                    token = token.substring(7).trim();
+                }
+
                 if (!token.isBlank()) {
                     email = jwtUtil.extractEmail(token);
                 }

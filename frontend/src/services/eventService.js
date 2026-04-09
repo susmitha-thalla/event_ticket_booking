@@ -45,8 +45,28 @@ export const getLiveEvents = async () => {
   return response.data;
 };
 
+export const getUpcomingEvents = async () => {
+  const response = await api.get("/events/upcoming");
+  return response.data;
+};
+
+export const getCompletedEvents = async () => {
+  const response = await api.get("/events/completed");
+  return response.data;
+};
+
 export const getStartingSoonEvents = async () => {
   const response = await api.get("/events/starting-soon");
+  return response.data;
+};
+
+export const getSeatBasedEvents = async () => {
+  const response = await api.get("/events/seat-based");
+  return response.data;
+};
+
+export const getNonSeatBasedEvents = async () => {
+  const response = await api.get("/events/non-seat-based");
   return response.data;
 };
 

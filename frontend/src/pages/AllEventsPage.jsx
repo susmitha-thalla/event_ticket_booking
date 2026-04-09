@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
-import { approveEvent, getAdminAllEvents } from "../services/eventService";
+import { approveEvent, deleteEvent, getAdminAllEvents } from "../services/eventService";
 
 const formatDateTime = (value) => {
   if (!value) return "N/A";
@@ -39,6 +39,17 @@ function AllEventsPage() {
     }
   };
 
+  const handleDelete = async (eventId) => {
+    try {
+      const response = await deleteEvent(eventId);
+      alert(response);
+      loadEvents();
+    } catch (error) {
+      console.error(error);
+      alert(error.response?.data || "Delete failed");
+    }
+  };
+
   return (
     <>
       <Navbar />
@@ -50,6 +61,19 @@ function AllEventsPage() {
 
         {events.map((event) => (
           <div className="card" key={event.eventId}>
+            {event.wallpaperUrl ? (
+              <img
+                src={event.wallpaperUrl}
+                alt={`${event.title} wallpaper`}
+                style={{
+                  width: "100%",
+                  height: "180px",
+                  objectFit: "cover",
+                  borderRadius: "12px",
+                  marginBottom: "12px",
+                }}
+              />
+            ) : null}
             <div className="card-title">{event.title}</div>
             <p className="subtext">{event.description}</p>
 
@@ -84,6 +108,14 @@ function AllEventsPage() {
               <div>
                 <button onClick={() => handleApprove(event.eventId)}>
                   Approve Event
+                </button>
+              </div>
+            )}
+
+            {!event.isDeleted && (
+              <div style={{ marginTop: "10px" }}>
+                <button className="danger" onClick={() => handleDelete(event.eventId)}>
+                  Delete Event
                 </button>
               </div>
             )}

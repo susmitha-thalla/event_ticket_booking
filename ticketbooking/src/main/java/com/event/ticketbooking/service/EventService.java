@@ -21,7 +21,7 @@ public class EventService {
     @Autowired
     private UserRepository userRepository;
 
-    public String createEvent(EventRequest request, Principal principal) {
+    public Event createEvent(EventRequest request, Principal principal) {
 
         String email = principal.getName();
 
@@ -30,7 +30,7 @@ public class EventService {
 
         if (!"ORGANIZER".equalsIgnoreCase(user.getRole()) &&
                 !"ROLE_ORGANIZER".equalsIgnoreCase(user.getRole())) {
-            return "Only organizers can create events!";
+            throw new RuntimeException("Only organizers can create events");
         }
 
         Event event = new Event();
@@ -51,9 +51,7 @@ public class EventService {
         event.setEventStatus(calculateEventStatus(request.getEventDate()));
         event.setIsDeleted(false);
 
-        eventRepository.save(event);
-
-        return "Event Created Successfully and sent for admin approval";
+        return eventRepository.save(event);
     }
 
     public List<Event> getAllEvents() {

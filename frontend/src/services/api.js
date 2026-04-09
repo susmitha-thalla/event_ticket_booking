@@ -16,9 +16,11 @@ const getStoredToken = () => {
     return "";
   }
 
-  return cleaned.toLowerCase().startsWith("bearer ")
+  const withoutBearer = cleaned.toLowerCase().startsWith("bearer ")
     ? cleaned.slice(7).trim()
     : cleaned;
+
+  return withoutBearer.replace(/^["']|["']$/g, "").trim();
 };
 
 api.interceptors.request.use((config) => {

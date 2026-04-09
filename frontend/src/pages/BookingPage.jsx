@@ -1,6 +1,7 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { bookTicket, getBookingsByEventId } from "../services/bookingService";
+import { bookTicket } from "../services/bookingService";
+import { getSeatMapByEvent } from "../services/seatService";
 import Navbar from "../components/Navbar";
 
 const formatAmount = (value) => Number(value || 0).toFixed(2);
@@ -22,9 +23,8 @@ function BookingPage() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [processingPayment, setProcessingPayment] = useState(false);
   const [selectedApp, setSelectedApp] = useState("");
-  const [seatInput, setSeatInput] = useState("");
-  const [selectedSeats, setSelectedSeats] = useState([]);
-  const [alreadyBookedSeats, setAlreadyBookedSeats] = useState([]);
+  const [selectedSeat, setSelectedSeat] = useState("");
+  const [seatMap, setSeatMap] = useState([]);
 
   if (!event) {
     return (
@@ -44,50 +44,29 @@ function BookingPage() {
   };
 
   useEffect(() => {
-    const loadBookedSeats = async () => {
+    const loadSeatMap = async () => {
       if (!requiresSeatSelection || !event?.eventId) return;
 
       try {
-        const bookings = await getBookingsByEventId(event.eventId);
-        const occupied = bookings
-          .filter((booking) => booking.bookingStatus !== "CANCELLED")
-          .flatMap((booking) => (booking.seatNumbers || "").split(","))
-          .map((seat) => seat.trim().toUpperCase())
-          .filter(Boolean);
-
-        setAlreadyBookedSeats(Array.from(new Set(occupied)));
+        const seats = await getSeatMapByEvent(event.eventId);
+        setSeatMap(seats || []);
       } catch (error) {
-        console.error("Failed to fetch booked seats", error);
+        console.error("Failed to fetch seat map", error);
       }
     };
 
-    loadBookedSeats();
+    loadSeatMap();
   }, [event?.eventId, requiresSeatSelection]);
 
-  const selectedSeatsSet = useMemo(() => new Set(selectedSeats), [selectedSeats]);
-  const alreadyBookedSeatsSet = useMemo(() => new Set(alreadyBookedSeats), [alreadyBookedSeats]);
-
-  const addSeat = () => {
-    const seatCode = seatInput.trim().toUpperCase();
-    if (!seatCode) return;
-
-    if (selectedSeatsSet.has(seatCode)) {
-      alert("Seat already selected.");
-      return;
+  const groupedSeats = useMemo(() => {
+    const groups = {};
+    for (const seat of seatMap) {
+      const row = seat.rowLabel || "ROW";
+      if (!groups[row]) groups[row] = [];
+      groups[row].push(seat);
     }
-
-    if (alreadyBookedSeatsSet.has(seatCode)) {
-      alert("This seat is already booked. Please select another seat.");
-      return;
-    }
-
-    setSelectedSeats((prev) => [...prev, seatCode]);
-    setSeatInput("");
-  };
-
-  const removeSeat = (seatCode) => {
-    setSelectedSeats((prev) => prev.filter((seat) => seat !== seatCode));
-  };
+    return Object.entries(groups).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [seatMap]);
 
   const openPaymentModal = (e) => {
     e.preventDefault();
@@ -97,8 +76,8 @@ function BookingPage() {
       return;
     }
 
-    if (requiresSeatSelection && selectedSeats.length === 0) {
-      alert("Please select at least one seat for this event.");
+    if (requiresSeatSelection && !selectedSeat) {
+      alert("Please select one seat for this event.");
       return;
     }
 
@@ -123,7 +102,7 @@ function BookingPage() {
         };
 
         if (requiresSeatSelection) {
-          payload.seatNumbers = selectedSeats;
+          payload.seatNumbers = [selectedSeat];
         } else {
           payload.quantity = Number(form.quantity);
         }
@@ -140,13 +119,25 @@ function BookingPage() {
         setProcessingPayment(false);
         setShowPaymentModal(false);
         console.error(error);
-        if (error?.response?.status === 401 || error?.response?.status === 403) {
-          alert("Session expired or unauthorized access. Please login again and retry booking.");
+
+        const status = error?.response?.status;
+        const backendMessage =
+          error?.response?.data?.message ||
+          (typeof error?.response?.data === "string" ? error.response.data : "") ||
+          error.message;
+
+        if (status === 401) {
+          alert(`Session expired (${status}). Please login again and retry booking.`);
           navigate("/user/login");
           return;
         }
 
-        alert(error.response?.data?.message || error.response?.data || error.message || "Booking failed");
+        if (status === 403) {
+          alert(`Forbidden (${status}): ${backendMessage || "Access denied by backend."}`);
+          return;
+        }
+
+        alert(backendMessage || "Booking failed");
       }
     }, 2000);
   };
@@ -162,7 +153,7 @@ function BookingPage() {
           <p><strong>{event.title}</strong></p>
           <p className="subtext">{event.location} • {event.category}</p>
           <p><strong>Price per ticket:</strong> ₹{formatAmount(event.price)}</p>
-          <p><strong>Seat Selection:</strong> {requiresSeatSelection ? "Required" : "Not Required"}</p>
+          <p><strong>Seat Selection:</strong> {requiresSeatSelection ? "Required (1 seat per user)" : "Not Required"}</p>
 
           <form onSubmit={openPaymentModal}>
             {!requiresSeatSelection && (
@@ -179,33 +170,38 @@ function BookingPage() {
 
             {requiresSeatSelection && (
               <div>
-                <div style={{ display: "flex", gap: "8px" }}>
-                  <input
-                    name="seatInput"
-                    placeholder="Enter Seat Number (e.g. A1)"
-                    value={seatInput}
-                    onChange={(e) => setSeatInput(e.target.value)}
-                  />
-                  <button type="button" onClick={addSeat}>
-                    Add Seat
-                  </button>
+                <div className="subtext" style={{ marginBottom: "8px" }}>
+                  Tap one available seat from the layout:
                 </div>
-
-                <div className="subtext" style={{ marginTop: "8px" }}>
-                  Already booked seats: {alreadyBookedSeats.length > 0 ? alreadyBookedSeats.join(", ") : "None"}
-                </div>
-
-                <div style={{ marginTop: "8px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                  {selectedSeats.map((seat) => (
-                    <button
-                      key={seat}
-                      type="button"
-                      className="secondary"
-                      onClick={() => removeSeat(seat)}
-                    >
-                      {seat} ×
-                    </button>
+                <div style={{ display: "grid", gap: "8px" }}>
+                  {groupedSeats.map(([row, seats]) => (
+                    <div key={row} style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                      <strong style={{ minWidth: "28px" }}>{row}</strong>
+                      {seats.map((seat) => {
+                        const isAvailable = seat.seatStatus === "AVAILABLE";
+                        const isSelected = selectedSeat === seat.seatCode;
+                        return (
+                          <button
+                            key={seat.seatCode}
+                            type="button"
+                            disabled={!isAvailable}
+                            className={isSelected ? "" : "secondary"}
+                            style={{
+                              minWidth: "56px",
+                              opacity: isAvailable ? 1 : 0.45,
+                              border: isSelected ? "2px solid #22c55e" : undefined,
+                            }}
+                            onClick={() => setSelectedSeat(seat.seatCode)}
+                          >
+                            {seat.seatCode}
+                          </button>
+                        );
+                      })}
+                    </div>
                   ))}
+                </div>
+                <div className="subtext" style={{ marginTop: "8px" }}>
+                  Selected Seat: {selectedSeat || "None"}
                 </div>
               </div>
             )}
@@ -261,7 +257,7 @@ function BookingPage() {
               <strong>Amount:</strong> ₹{
                 requiresSeatSelection
                   ? formatAmount(
-                      selectedSeats.length * Number(event.price || 0)
+                      Number(event.price || 0)
                     )
                   : formatAmount(Number(form.quantity || 0) * Number(event.price || 0))
               }
