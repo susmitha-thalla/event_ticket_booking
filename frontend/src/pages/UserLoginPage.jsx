@@ -17,9 +17,15 @@ function UserLoginPage() {
     e.preventDefault();
     try {
       const response = await loginUser(form);
-      localStorage.setItem("token", response.token);
-      localStorage.setItem("role", response.role);
-      localStorage.setItem("email", response.email);
+      const token = response?.token || response?.accessToken || response?.jwt;
+      if (!token) {
+        setErrorMsg("Login response is missing token. Please try again.");
+        return;
+      }
+
+      localStorage.setItem("token", token);
+      localStorage.setItem("role", response?.role || "");
+      localStorage.setItem("email", response?.email || "");
 
       if (response.role === "USER" || response.role === "ROLE_USER") {
         navigate("/events");

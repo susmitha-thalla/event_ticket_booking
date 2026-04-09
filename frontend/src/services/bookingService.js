@@ -20,6 +20,11 @@ export const getAllBookings = async () => {
   return response.data;
 };
 
+export const getBookingsByEventId = async (eventId) => {
+  const response = await api.get(`/bookings/event/${eventId}`);
+  return response.data;
+};
+
 export const cancelMyBooking = async (bookingId) => {
   const response = await api.put(`/bookings/cancel/${bookingId}`);
   return response.data;

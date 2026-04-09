@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from "react-router-dom";
-import { useState } from "react";
-import { bookTicket } from "../services/bookingService";
+import { useEffect, useMemo, useState } from "react";
+import { bookTicket, getBookingsByEventId } from "../services/bookingService";
 import Navbar from "../components/Navbar";
 
 const formatAmount = (value) => Number(value || 0).toFixed(2);
@@ -22,6 +22,9 @@ function BookingPage() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [processingPayment, setProcessingPayment] = useState(false);
   const [selectedApp, setSelectedApp] = useState("");
+  const [seatInput, setSeatInput] = useState("");
+  const [selectedSeats, setSelectedSeats] = useState([]);
+  const [alreadyBookedSeats, setAlreadyBookedSeats] = useState([]);
 
   if (!event) {
     return (
@@ -40,6 +43,52 @@ function BookingPage() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
+  useEffect(() => {
+    const loadBookedSeats = async () => {
+      if (!requiresSeatSelection || !event?.eventId) return;
+
+      try {
+        const bookings = await getBookingsByEventId(event.eventId);
+        const occupied = bookings
+          .filter((booking) => booking.bookingStatus !== "CANCELLED")
+          .flatMap((booking) => (booking.seatNumbers || "").split(","))
+          .map((seat) => seat.trim().toUpperCase())
+          .filter(Boolean);
+
+        setAlreadyBookedSeats(Array.from(new Set(occupied)));
+      } catch (error) {
+        console.error("Failed to fetch booked seats", error);
+      }
+    };
+
+    loadBookedSeats();
+  }, [event?.eventId, requiresSeatSelection]);
+
+  const selectedSeatsSet = useMemo(() => new Set(selectedSeats), [selectedSeats]);
+  const alreadyBookedSeatsSet = useMemo(() => new Set(alreadyBookedSeats), [alreadyBookedSeats]);
+
+  const addSeat = () => {
+    const seatCode = seatInput.trim().toUpperCase();
+    if (!seatCode) return;
+
+    if (selectedSeatsSet.has(seatCode)) {
+      alert("Seat already selected.");
+      return;
+    }
+
+    if (alreadyBookedSeatsSet.has(seatCode)) {
+      alert("This seat is already booked. Please select another seat.");
+      return;
+    }
+
+    setSelectedSeats((prev) => [...prev, seatCode]);
+    setSeatInput("");
+  };
+
+  const removeSeat = (seatCode) => {
+    setSelectedSeats((prev) => prev.filter((seat) => seat !== seatCode));
+  };
+
   const openPaymentModal = (e) => {
     e.preventDefault();
 
@@ -48,8 +97,8 @@ function BookingPage() {
       return;
     }
 
-    if (requiresSeatSelection && !form.seatNumbers.trim()) {
-      alert("Please enter seat numbers for this event.");
+    if (requiresSeatSelection && selectedSeats.length === 0) {
+      alert("Please select at least one seat for this event.");
       return;
     }
 
@@ -67,11 +116,6 @@ function BookingPage() {
 
     setTimeout(async () => {
       try {
-        const parsedSeatNumbers = form.seatNumbers
-          .split(",")
-          .map((seat) => seat.trim().toUpperCase())
-          .filter(Boolean);
-
         const payload = {
           eventId: Number(form.eventId),
           gender: form.gender,
@@ -79,7 +123,7 @@ function BookingPage() {
         };
 
         if (requiresSeatSelection) {
-          payload.seatNumbers = parsedSeatNumbers;
+          payload.seatNumbers = selectedSeats;
         } else {
           payload.quantity = Number(form.quantity);
         }
@@ -96,6 +140,12 @@ function BookingPage() {
         setProcessingPayment(false);
         setShowPaymentModal(false);
         console.error(error);
+        if (error?.response?.status === 401 || error?.response?.status === 403) {
+          alert("Session expired or unauthorized access. Please login again and retry booking.");
+          navigate("/user/login");
+          return;
+        }
+
         alert(error.response?.data?.message || error.response?.data || error.message || "Booking failed");
       }
     }, 2000);
@@ -128,13 +178,36 @@ function BookingPage() {
             )}
 
             {requiresSeatSelection && (
-              <input
-                name="seatNumbers"
-                placeholder="Seat numbers (A1,A2)"
-                value={form.seatNumbers}
-                onChange={handleChange}
-                required
-              />
+              <div>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <input
+                    name="seatInput"
+                    placeholder="Enter Seat Number (e.g. A1)"
+                    value={seatInput}
+                    onChange={(e) => setSeatInput(e.target.value)}
+                  />
+                  <button type="button" onClick={addSeat}>
+                    Add Seat
+                  </button>
+                </div>
+
+                <div className="subtext" style={{ marginTop: "8px" }}>
+                  Already booked seats: {alreadyBookedSeats.length > 0 ? alreadyBookedSeats.join(", ") : "None"}
+                </div>
+
+                <div style={{ marginTop: "8px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  {selectedSeats.map((seat) => (
+                    <button
+                      key={seat}
+                      type="button"
+                      className="secondary"
+                      onClick={() => removeSeat(seat)}
+                    >
+                      {seat} ×
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
 
             <select
@@ -188,10 +261,7 @@ function BookingPage() {
               <strong>Amount:</strong> ₹{
                 requiresSeatSelection
                   ? formatAmount(
-                      form.seatNumbers
-                        .split(",")
-                        .map((seat) => seat.trim())
-                        .filter(Boolean).length * Number(event.price || 0)
+                      selectedSeats.length * Number(event.price || 0)
                     )
                   : formatAmount(Number(form.quantity || 0) * Number(event.price || 0))
               }
