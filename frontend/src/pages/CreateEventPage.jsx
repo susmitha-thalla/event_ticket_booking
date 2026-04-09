@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { createEvent } from "../services/eventService";
 import { createSeatLayout } from "../services/seatService";
+import { uploadEventWallpaper } from "../services/uploadService";
 
 function CreateEventPage() {
   const navigate = useNavigate();
@@ -19,6 +20,8 @@ function CreateEventPage() {
     recurrenceType: "NONE",
   });
   const [seatLayout, setSeatLayout] = useState("");
+  const [wallpaperFile, setWallpaperFile] = useState(null);
+  const [wallpaperPreview, setWallpaperPreview] = useState("");
 
   const parsedUniqueSeats = useMemo(() => {
     if (!form.hasSeats) return [];
@@ -42,6 +45,11 @@ function CreateEventPage() {
   const handleCreate = async (e) => {
     e.preventDefault();
 
+    if (!wallpaperFile && !form.wallpaperUrl.trim()) {
+      alert("Please upload an event wallpaper image or provide wallpaper URL.");
+      return;
+    }
+
     if (form.hasSeats && parsedUniqueSeats.length === 0) {
       alert("Please enter seat layout for a seat-based event.");
       return;
@@ -57,12 +65,19 @@ function CreateEventPage() {
     }
 
     try {
+      let finalWallpaperUrl = form.wallpaperUrl;
+
+      if (wallpaperFile) {
+        const uploaded = await uploadEventWallpaper(wallpaperFile);
+        finalWallpaperUrl = uploaded?.url || finalWallpaperUrl;
+      }
+
       const createdEvent = await createEvent({
         title: form.title,
         description: form.description,
         location: form.location,
         category: form.category,
-        wallpaperUrl: form.wallpaperUrl,
+        wallpaperUrl: finalWallpaperUrl,
         eventDate: form.eventDate,
         price: Number(form.price),
         availableSeats,
@@ -93,6 +108,8 @@ function CreateEventPage() {
         recurrenceType: "NONE",
       });
       setSeatLayout("");
+      setWallpaperFile(null);
+      setWallpaperPreview("");
     } catch (error) {
       console.error(error);
       const status = error?.response?.status;
@@ -130,14 +147,26 @@ function CreateEventPage() {
             <input
               type="url"
               name="wallpaperUrl"
-              placeholder="Event Wallpaper URL"
+              placeholder="Event Wallpaper URL (optional if uploading file)"
               value={form.wallpaperUrl}
               onChange={handleChange}
-              required
             />
-            {form.wallpaperUrl ? (
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/jpg,image/webp"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                setWallpaperFile(file || null);
+                if (file) {
+                  setWallpaperPreview(URL.createObjectURL(file));
+                } else {
+                  setWallpaperPreview("");
+                }
+              }}
+            />
+            {(wallpaperPreview || form.wallpaperUrl) ? (
               <img
-                src={form.wallpaperUrl}
+                src={wallpaperPreview || form.wallpaperUrl}
                 alt="Event wallpaper preview"
                 style={{ width: "100%", height: "170px", objectFit: "cover", borderRadius: "12px" }}
                 onError={(e) => {
