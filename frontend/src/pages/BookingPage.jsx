@@ -71,6 +71,13 @@ function BookingPage() {
   const openPaymentModal = (e) => {
     e.preventDefault();
 
+    const role = (localStorage.getItem("role") || "").toUpperCase();
+    if (role !== "USER" && role !== "ROLE_USER") {
+      alert("Please login with a USER account to book tickets.");
+      navigate("/user/login");
+      return;
+    }
+
     if (!form.gender || !form.paymentMode) {
       alert("Please fill all details and select payment mode.");
       return;
@@ -121,19 +128,23 @@ function BookingPage() {
         console.error(error);
 
         const status = error?.response?.status;
+        const errorMessage = error?.message || "";
         const backendMessage =
           error?.response?.data?.message ||
           (typeof error?.response?.data === "string" ? error.response.data : "") ||
           error.message;
 
-        if (status === 401) {
-          alert(`Session expired (${status}). Please login again and retry booking.`);
-          navigate("/user/login");
-          return;
-        }
+        const looksLikeAuthError =
+          status === 401 ||
+          status === 403 ||
+          /status code 401/i.test(errorMessage) ||
+          /status code 403/i.test(errorMessage) ||
+          /forbidden/i.test(errorMessage) ||
+          /unauthorized/i.test(errorMessage);
 
-        if (status === 403) {
-          alert(`Forbidden (${status}): ${backendMessage || "Access denied by backend."}`);
+        if (looksLikeAuthError) {
+          alert(`Authorization failed (${status}). Please login again and retry booking.`);
+          navigate("/user/login");
           return;
         }
 

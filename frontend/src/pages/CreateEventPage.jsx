@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
-import { createEvent } from "../services/eventService";
+import { createEvent, deleteEvent } from "../services/eventService";
 import { createSeatLayout } from "../services/seatService";
 import { uploadEventWallpaper } from "../services/uploadService";
 
@@ -98,7 +98,7 @@ function CreateEventPage() {
         )}/1200/600`;
       }
 
-      const createdEvent = await createEvent({
+      const basePayload = {
         title: form.title,
         description: form.description,
         location: form.location,
@@ -109,14 +109,66 @@ function CreateEventPage() {
         availableSeats,
         hasSeats: Boolean(form.hasSeats),
         recurrenceType: form.recurrenceType || "NONE",
-      });
+      };
+
+      const createdEvent = await createEvent(basePayload);
 
       if (form.hasSeats && !createdEvent?.eventId) {
         throw new Error("Event created but eventId was not returned. Please update backend create-event response.");
       }
 
       if (form.hasSeats) {
-        await createSeatLayout(createdEvent.eventId, generatedSeats);
+        try {
+          await createSeatLayout(createdEvent.eventId, generatedSeats);
+        } catch (seatErr) {
+          const seatStatus = seatErr?.response?.status;
+
+          if (seatStatus === 401) {
+            alert("Session expired while saving seat layout. Please login again.");
+            navigate("/organizer/login");
+            return;
+          }
+
+          if (seatStatus === 403 || seatStatus === 404) {
+            // If deployed backend doesn't support seat-layout endpoint yet,
+            // create a non-seat event fallback so organizer can still proceed.
+            try {
+              await deleteEvent(createdEvent.eventId);
+            } catch {
+              // ignore cleanup failure
+            }
+
+            await createEvent({
+              ...basePayload,
+              hasSeats: false,
+              availableSeats: generatedSeats.length,
+            });
+
+            alert(
+              "Seat-layout API is unavailable on current backend deployment. " +
+              `Created event as non-seat event with ${generatedSeats.length} tickets.`
+            );
+
+            setForm({
+              title: "",
+              description: "",
+              location: "",
+              category: "",
+              wallpaperUrl: "",
+              eventDate: "",
+              price: "",
+              availableSeats: "",
+              hasSeats: false,
+              recurrenceType: "NONE",
+            });
+            setLayoutSize("SMALL");
+            setWallpaperFile(null);
+            setWallpaperPreview("");
+            return;
+          }
+
+          throw seatErr;
+        }
       }
 
       alert("Event created successfully and sent for admin approval.");
@@ -139,19 +191,23 @@ function CreateEventPage() {
     } catch (error) {
       console.error(error);
       const status = error?.response?.status;
+      const errorMessage = error?.message || "";
       const backendMessage =
         error?.response?.data?.message ||
         (typeof error?.response?.data === "string" ? error.response.data : "") ||
         error.message;
 
-      if (status === 401) {
-        alert(`Session expired (${status}). Please login again as organizer.`);
-        navigate("/organizer/login");
-        return;
-      }
+      const looksLikeAuthError =
+        status === 401 ||
+        status === 403 ||
+        /status code 401/i.test(errorMessage) ||
+        /status code 403/i.test(errorMessage) ||
+        /forbidden/i.test(errorMessage) ||
+        /unauthorized/i.test(errorMessage);
 
-      if (status === 403) {
-        alert(`Forbidden (${status}): ${backendMessage || "Access denied by backend."}`);
+      if (looksLikeAuthError) {
+        alert(`Authorization failed (${status}). Please login again as organizer.`);
+        navigate("/organizer/login");
         return;
       }
 

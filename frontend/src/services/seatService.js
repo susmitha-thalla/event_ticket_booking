@@ -1,8 +1,13 @@
 import api from "./api";
+import { getAuthHeader } from "./authHeader";
 
 export const createSeatLayout = async (eventId, seatCodes) => {
   const response = await api.post(`/seats/layout/${eventId}`, {
     seatCodes,
+  }, {
+    headers: {
+      ...getAuthHeader(),
+    },
   });
   return response.data;
 };

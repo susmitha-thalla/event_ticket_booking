@@ -1,4 +1,5 @@
 import api from "./api";
+import { getAuthHeader } from "./authHeader";
 
 export const getAllEvents = async () => {
   const response = await api.get("/events/all");
@@ -21,7 +22,11 @@ export const getEventsByDate = async (start, end) => {
 };
 
 export const createEvent = async (data) => {
-  const response = await api.post("/events/create", data);
+  const response = await api.post("/events/create", data, {
+    headers: {
+      ...getAuthHeader(),
+    },
+  });
   return response.data;
 };
 
@@ -36,7 +41,11 @@ export const getAdminAllEvents = async () => {
 };
 
 export const approveEvent = async (eventId) => {
-  const response = await api.post(`/events/approve/${eventId}`);
+  const response = await api.post(`/events/approve/${eventId}`, null, {
+    headers: {
+      ...getAuthHeader(),
+    },
+  });
   return response.data;
 };
 
@@ -71,6 +80,10 @@ export const getNonSeatBasedEvents = async () => {
 };
 
 export const deleteEvent = async (eventId) => {
-  const response = await api.delete(`/events/${eventId}`);
+  const response = await api.delete(`/events/${eventId}`, {
+    headers: {
+      ...getAuthHeader(),
+    },
+  });
   return response.data;
 };

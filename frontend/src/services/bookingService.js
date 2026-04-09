@@ -1,7 +1,12 @@
 import api from "./api";
+import { getAuthHeader } from "./authHeader";
 
 export const bookTicket = async (data) => {
-  const response = await api.post("/bookings/book", data);
+  const response = await api.post("/bookings/book", data, {
+    headers: {
+      ...getAuthHeader(),
+    },
+  });
   return response.data;
 };
 
@@ -26,11 +31,19 @@ export const getBookingsByEventId = async (eventId) => {
 };
 
 export const cancelMyBooking = async (bookingId) => {
-  const response = await api.put(`/bookings/cancel/${bookingId}`);
+  const response = await api.put(`/bookings/cancel/${bookingId}`, null, {
+    headers: {
+      ...getAuthHeader(),
+    },
+  });
   return response.data;
 };
 
 export const cancelBookingByAdmin = async (bookingId) => {
-  const response = await api.put(`/bookings/admin/cancel/${bookingId}`);
+  const response = await api.put(`/bookings/admin/cancel/${bookingId}`, null, {
+    headers: {
+      ...getAuthHeader(),
+    },
+  });
   return response.data;
 };
