@@ -5,8 +5,31 @@ import { createEvent } from "../services/eventService";
 import { createSeatLayout } from "../services/seatService";
 import { uploadEventWallpaper } from "../services/uploadService";
 
+const LAYOUT_OPTIONS = {
+  SMALL: 50,
+  MEDIUM: 150,
+  LARGE: 200,
+};
+
+const generateSeatCodes = (seatCount) => {
+  const perRow = 10;
+  const seats = [];
+  const rowCount = Math.ceil(seatCount / perRow);
+
+  for (let row = 0; row < rowCount; row += 1) {
+    const rowLabel = String.fromCharCode(65 + row);
+    for (let num = 1; num <= perRow; num += 1) {
+      if (seats.length >= seatCount) break;
+      seats.push(`${rowLabel}${num}`);
+    }
+  }
+
+  return seats;
+};
+
 function CreateEventPage() {
   const navigate = useNavigate();
+  const canUploadWallpapers = import.meta.env.VITE_ENABLE_WALLPAPER_UPLOAD === "true";
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -19,19 +42,14 @@ function CreateEventPage() {
     hasSeats: false,
     recurrenceType: "NONE",
   });
-  const [seatLayout, setSeatLayout] = useState("");
+  const [layoutSize, setLayoutSize] = useState("SMALL");
   const [wallpaperFile, setWallpaperFile] = useState(null);
   const [wallpaperPreview, setWallpaperPreview] = useState("");
 
-  const parsedUniqueSeats = useMemo(() => {
+  const generatedSeats = useMemo(() => {
     if (!form.hasSeats) return [];
-    const seats = seatLayout
-      .split(/[\n,]+/)
-      .map((seat) => seat.trim().toUpperCase())
-      .filter(Boolean);
-
-    return Array.from(new Set(seats));
-  }, [seatLayout, form.hasSeats]);
+    return generateSeatCodes(LAYOUT_OPTIONS[layoutSize]);
+  }, [form.hasSeats, layoutSize]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -45,18 +63,13 @@ function CreateEventPage() {
   const handleCreate = async (e) => {
     e.preventDefault();
 
-    if (!wallpaperFile && !form.wallpaperUrl.trim()) {
-      alert("Please upload an event wallpaper image or provide wallpaper URL.");
-      return;
-    }
-
-    if (form.hasSeats && parsedUniqueSeats.length === 0) {
-      alert("Please enter seat layout for a seat-based event.");
+    if (form.hasSeats && generatedSeats.length === 0) {
+      alert("Please select seat layout size for a seat-based event.");
       return;
     }
 
     const availableSeats = form.hasSeats
-      ? parsedUniqueSeats.length
+      ? generatedSeats.length
       : Number(form.availableSeats);
 
     if (!availableSeats || Number(availableSeats) <= 0) {
@@ -65,11 +78,24 @@ function CreateEventPage() {
     }
 
     try {
-      let finalWallpaperUrl = form.wallpaperUrl;
+      let finalWallpaperUrl = form.wallpaperUrl.trim();
 
-      if (wallpaperFile) {
-        const uploaded = await uploadEventWallpaper(wallpaperFile);
-        finalWallpaperUrl = uploaded?.url || finalWallpaperUrl;
+      if (wallpaperFile && canUploadWallpapers) {
+        try {
+          const uploaded = await uploadEventWallpaper(wallpaperFile);
+          finalWallpaperUrl = uploaded?.url || finalWallpaperUrl;
+        } catch (uploadError) {
+          const uploadStatus = uploadError?.response?.status;
+          if (uploadStatus !== 403) {
+            throw uploadError;
+          }
+        }
+      }
+
+      if (!finalWallpaperUrl) {
+        finalWallpaperUrl = `https://picsum.photos/seed/${encodeURIComponent(
+          form.title || "event"
+        )}/1200/600`;
       }
 
       const createdEvent = await createEvent({
@@ -90,7 +116,7 @@ function CreateEventPage() {
       }
 
       if (form.hasSeats) {
-        await createSeatLayout(createdEvent.eventId, parsedUniqueSeats);
+        await createSeatLayout(createdEvent.eventId, generatedSeats);
       }
 
       alert("Event created successfully and sent for admin approval.");
@@ -107,7 +133,7 @@ function CreateEventPage() {
         hasSeats: false,
         recurrenceType: "NONE",
       });
-      setSeatLayout("");
+      setLayoutSize("SMALL");
       setWallpaperFile(null);
       setWallpaperPreview("");
     } catch (error) {
@@ -147,13 +173,14 @@ function CreateEventPage() {
             <input
               type="url"
               name="wallpaperUrl"
-              placeholder="Event Wallpaper URL (optional if uploading file)"
+              placeholder="Event Wallpaper URL (optional)"
               value={form.wallpaperUrl}
               onChange={handleChange}
             />
             <input
               type="file"
               accept="image/png,image/jpeg,image/jpg,image/webp"
+              disabled={!canUploadWallpapers}
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 setWallpaperFile(file || null);
@@ -164,6 +191,11 @@ function CreateEventPage() {
                 }
               }}
             />
+            {!canUploadWallpapers && (
+              <div className="subtext">
+                Wallpaper upload is disabled for this deployment. Use Wallpaper URL instead.
+              </div>
+            )}
             {(wallpaperPreview || form.wallpaperUrl) ? (
               <img
                 src={wallpaperPreview || form.wallpaperUrl}
@@ -216,17 +248,19 @@ function CreateEventPage() {
 
             {form.hasSeats ? (
               <>
-                <textarea
-                  rows="4"
-                  value={seatLayout}
-                  onChange={(e) => setSeatLayout(e.target.value)}
-                  placeholder="Enter seat codes (comma/new line), e.g. A1,A2,A3,B1"
-                  required
-                />
-                <div className="subtext">Unique seats detected: {parsedUniqueSeats.length}</div>
+                <select value={layoutSize} onChange={(e) => setLayoutSize(e.target.value)}>
+                  <option value="SMALL">Small Layout (50 seats)</option>
+                  <option value="MEDIUM">Medium Layout (150 seats)</option>
+                  <option value="LARGE">Large Layout (200 seats)</option>
+                </select>
+                <div className="subtext">Auto-generated seats: {generatedSeats.length}</div>
+                <div className="subtext">
+                  Preview: {generatedSeats.slice(0, 20).join(", ")}
+                  {generatedSeats.length > 20 ? " ..." : ""}
+                </div>
                 <input
                   name="availableSeats"
-                  value={parsedUniqueSeats.length}
+                  value={generatedSeats.length}
                   readOnly
                   placeholder="Available Seats"
                 />
