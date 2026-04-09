@@ -92,6 +92,10 @@ public class BookingService {
                 throw new RuntimeException("This event requires seat selection");
             }
 
+            if (request.getSeatNumbers() == null || request.getSeatNumbers().size() != 1) {
+                throw new RuntimeException("For seat-based events, one user can book only one seat per booking");
+            }
+
             selectedSeats = validateAndLoadSeats(request, event);
             quantity = selectedSeats.size();
 

@@ -17,6 +17,8 @@ public class Event {
     private LocalDateTime eventDate;
     private Double price;
     private Integer availableSeats;
+    @Column(length = 1200)
+    private String wallpaperUrl;
 
     private String createdBy; // organizer email
     private String category; // MUSIC, TECH, SPORTS etc
@@ -107,6 +109,14 @@ public class Event {
 
     public void setAvailableSeats(Integer availableSeats) {
         this.availableSeats = availableSeats;
+    }
+
+    public String getWallpaperUrl() {
+        return wallpaperUrl;
+    }
+
+    public void setWallpaperUrl(String wallpaperUrl) {
+        this.wallpaperUrl = wallpaperUrl;
     }
 
     public String getCreatedBy() {

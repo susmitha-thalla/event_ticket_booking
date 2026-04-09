@@ -41,6 +41,7 @@ public class EventService {
         event.setEventDate(request.getEventDate());
         event.setPrice(request.getPrice());
         event.setAvailableSeats(request.getAvailableSeats());
+        event.setWallpaperUrl(request.getWallpaperUrl());
         event.setCreatedBy(user.getEmail());
         event.setApprovalStatus("PENDING");
         event.setOrganizerPaid(true);
@@ -116,12 +117,44 @@ public class EventService {
                 .toList();
     }
 
+    public List<Event> getUpcomingEvents() {
+        refreshAllStatuses();
+        return eventRepository.findByEventStatusAndIsDeletedFalse("UPCOMING")
+                .stream()
+                .filter(event -> "APPROVED".equalsIgnoreCase(event.getApprovalStatus()))
+                .toList();
+    }
+
+    public List<Event> getCompletedEvents() {
+        refreshAllStatuses();
+        return eventRepository.findByEventStatusAndIsDeletedFalse("ENDED")
+                .stream()
+                .filter(event -> "APPROVED".equalsIgnoreCase(event.getApprovalStatus()))
+                .toList();
+    }
+
     public List<Event> getStartingSoonEvents() {
         LocalDateTime now = LocalDateTime.now();
         refreshAllStatuses();
         return eventRepository.findByEventDateBetweenAndIsDeletedFalse(now, now.plusDays(2))
                 .stream()
                 .filter(event -> "APPROVED".equalsIgnoreCase(event.getApprovalStatus()))
+                .toList();
+    }
+
+    public List<Event> getSeatBasedEvents() {
+        refreshAllStatuses();
+        return eventRepository.findByApprovalStatusAndIsDeletedFalse("APPROVED")
+                .stream()
+                .filter(event -> Boolean.TRUE.equals(event.getHasSeats()))
+                .toList();
+    }
+
+    public List<Event> getNonSeatBasedEvents() {
+        refreshAllStatuses();
+        return eventRepository.findByApprovalStatusAndIsDeletedFalse("APPROVED")
+                .stream()
+                .filter(event -> !Boolean.TRUE.equals(event.getHasSeats()))
                 .toList();
     }
 

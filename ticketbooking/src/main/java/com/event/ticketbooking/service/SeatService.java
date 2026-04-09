@@ -1,6 +1,7 @@
 package com.event.ticketbooking.service;
 
 import com.event.ticketbooking.dto.SeatLayoutRequest;
+import com.event.ticketbooking.dto.SeatViewResponse;
 import com.event.ticketbooking.model.Event;
 import com.event.ticketbooking.model.Seat;
 import com.event.ticketbooking.model.User;
@@ -13,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.Principal;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -108,6 +110,24 @@ public class SeatService {
                 .map(String::trim)
                 .map(code -> code.toUpperCase(Locale.ROOT))
                 .distinct()
+                .toList();
+    }
+
+    public List<SeatViewResponse> getSeatMapByEventId(Long eventId) {
+        return seatRepository.findByEvent_EventIdAndIsDeletedFalse(eventId)
+                .stream()
+                .sorted(Comparator
+                        .comparing((Seat seat) -> seat.getRowLabel() == null ? "" : seat.getRowLabel())
+                        .thenComparing(seat -> seat.getSeatNumber() == null ? Integer.MAX_VALUE : seat.getSeatNumber()))
+                .map(seat -> new SeatViewResponse(
+                        seat.getSeatCode(),
+                        seat.getRowLabel(),
+                        seat.getSeatNumber(),
+                        seat.getSeatStatus(),
+                        seat.getSectionName(),
+                        seat.getSeatType(),
+                        seat.getPriceOverride()
+                ))
                 .toList();
     }
 

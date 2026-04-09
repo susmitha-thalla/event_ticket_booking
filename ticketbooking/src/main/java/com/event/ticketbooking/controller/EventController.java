@@ -69,10 +69,30 @@ public class EventController {
         return eventService.getLiveEvents();
     }
 
+    @GetMapping("/upcoming")
+    public List<Event> getUpcomingEvents() {
+        return eventService.getUpcomingEvents();
+    }
+
+    @GetMapping("/completed")
+    public List<Event> getCompletedEvents() {
+        return eventService.getCompletedEvents();
+    }
+
     // NEW: events starting within next 2 days
     @GetMapping("/starting-soon")
     public List<Event> getStartingSoonEvents() {
         return eventService.getStartingSoonEvents();
+    }
+
+    @GetMapping("/seat-based")
+    public List<Event> getSeatBasedEvents() {
+        return eventService.getSeatBasedEvents();
+    }
+
+    @GetMapping("/non-seat-based")
+    public List<Event> getNonSeatBasedEvents() {
+        return eventService.getNonSeatBasedEvents();
     }
 
     // NEW: soft delete event

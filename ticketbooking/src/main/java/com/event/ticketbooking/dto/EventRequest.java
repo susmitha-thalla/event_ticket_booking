@@ -10,6 +10,7 @@ public class EventRequest {
     private LocalDateTime eventDate;
     private Double price;
     private Integer availableSeats;
+    private String wallpaperUrl;
     private String category;
     private Boolean hasSeats;
     private String recurrenceType;
@@ -63,6 +64,14 @@ public class EventRequest {
 
     public void setAvailableSeats(Integer availableSeats) {
         this.availableSeats = availableSeats;
+    }
+
+    public String getWallpaperUrl() {
+        return wallpaperUrl;
+    }
+
+    public void setWallpaperUrl(String wallpaperUrl) {
+        this.wallpaperUrl = wallpaperUrl;
     }
 
     public String getCategory() {
