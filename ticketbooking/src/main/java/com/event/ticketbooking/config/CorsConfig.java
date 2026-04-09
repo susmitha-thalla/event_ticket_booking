@@ -3,26 +3,63 @@ package com.event.ticketbooking.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.*;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.Arrays;
 import java.util.List;
 
 @Configuration
 public class CorsConfig {
 
     @Bean
-    public org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource() {
+    public CorsConfigurationSource corsConfigurationSource() {
+
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of(
+
+        // =========================
+        // ALLOWED ORIGINS
+        // =========================
+        configuration.setAllowedOriginPatterns(Arrays.asList(
                 "http://localhost:5173",
-                "https://event-ticket-booking-eight.vercel.app/"
+                "http://localhost:*",
+                "https://*.vercel.app",
+                "https://event-ticket-booking-eight.vercel.app"
         ));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+
+        // =========================
+        // METHODS
+        // =========================
+        configuration.setAllowedMethods(List.of(
+                "GET",
+                "POST",
+                "PUT",
+                "DELETE",
+                "OPTIONS"
+        ));
+
+        // =========================
+        // HEADERS
+        // =========================
         configuration.setAllowedHeaders(List.of("*"));
+
+        // =========================
+        // EXPOSE HEADERS (IMPORTANT FOR JWT)
+        // =========================
+        configuration.setExposedHeaders(List.of(
+                "Authorization",
+                "Content-Type"
+        ));
+
+        // =========================
+        // CREDENTIALS
+        // =========================
         configuration.setAllowCredentials(true);
 
-        org.springframework.web.cors.UrlBasedCorsConfigurationSource source =
-                new org.springframework.web.cors.UrlBasedCorsConfigurationSource();
+        // =========================
+        // CACHE PREFLIGHT RESPONSE
+        // =========================
+        configuration.setMaxAge(3600L);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
 
         return source;

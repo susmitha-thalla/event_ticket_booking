@@ -109,9 +109,9 @@ function BookingPage() {
               required
               >
               <option value="">Select Gender</option>
-              <option value="UPI">Female</option>
-              <option value="CARD">Male</option>
-              <option value="CARD">Other</option>
+              <option value="Female">Female</option>
+              <option value="Male">Male</option>
+              <option value="Other">Other</option>
               </select>
           
 

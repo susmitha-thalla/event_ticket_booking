@@ -4,7 +4,6 @@ import com.event.ticketbooking.dto.LoginRequest;
 import com.event.ticketbooking.dto.LoginResponse;
 import com.event.ticketbooking.dto.RegisterRequest;
 import com.event.ticketbooking.model.User;
-import com.event.ticketbooking.repository.UserRepository;
 import com.event.ticketbooking.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -13,6 +12,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/users")
+@CrossOrigin(origins = "*")
 public class UserController {
 
     @Autowired
@@ -27,11 +27,24 @@ public class UserController {
     public LoginResponse login(@RequestBody LoginRequest request) {
         return userService.loginUser(request);
     }
-    @Autowired
-    private UserRepository userRepository;
 
     @GetMapping("/all")
     public List<User> getAllUsers() {
-        return userRepository.findAll();
+        return userService.getAllUsers();
     }
+
+    @GetMapping("/{userId}")
+    public User getUserById(@PathVariable Long userId) {
+        return userService.getUserById(userId);
     }
+
+    @PutMapping("/block/{userId}")
+    public String blockUser(@PathVariable Long userId) {
+        return userService.blockUser(userId);
+    }
+
+    @DeleteMapping("/{userId}")
+    public String deleteUser(@PathVariable Long userId) {
+        return userService.softDeleteUser(userId);
+    }
+}

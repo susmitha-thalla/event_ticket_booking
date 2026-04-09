@@ -4,6 +4,7 @@ import com.event.ticketbooking.security.JwtFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -23,22 +24,85 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
+
+                        // =========================
+                        // PUBLIC AUTH
+                        // =========================
                         .requestMatchers("/api/users/register", "/api/users/login").permitAll()
-                        .requestMatchers("/api/events/all", "/api/events/category/**", "/api/events/location/**", "/api/events/filter", "/api/events/date").permitAll()
-
-                        // authenticated endpoints
-                        .requestMatchers("/api/events/create").authenticated()
-                        .requestMatchers("/api/events/my-events").authenticated()
-                        .requestMatchers("/api/events/admin/all").authenticated()
-                        .requestMatchers("/api/events/approve/**").authenticated()
-
-                        .requestMatchers("/api/bookings/book").authenticated()
-                        .requestMatchers("/api/bookings/my-bookings").authenticated()
-                        .requestMatchers("/api/bookings/organizer-bookings").authenticated()
-                        .requestMatchers("/api/bookings/all").authenticated()
-
-                        .requestMatchers("/api/users/all").authenticated()
                         .requestMatchers("/generated_qr/**").permitAll()
+
+                        // =========================
+                        // PUBLIC EVENT APIs
+                        // =========================
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/events/all",
+                                "/api/events/live",
+                                "/api/events/upcoming",
+                                "/api/events/completed",
+                                "/api/events/starting-soon",
+                                "/api/events/seat-based",
+                                "/api/events/non-seat-based",
+                                "/api/events/date",
+                                "/api/events/filter",
+                                "/api/events/category/**",
+                                "/api/events/location/**",
+                                "/api/events/*"
+                        ).permitAll()
+
+                        // =========================
+                        // ORGANIZER / ADMIN EVENT WRITE APIs
+                        // service layer will still verify ownership/admin
+                        // =========================
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/events/create"
+                        ).authenticated()
+
+                        .requestMatchers(HttpMethod.PUT,
+                                "/api/events/*"
+                        ).authenticated()
+
+                        .requestMatchers(HttpMethod.DELETE,
+                                "/api/events/*"
+                        ).authenticated()
+
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/events/my-events",
+                                "/api/events/my-events/**",
+                                "/api/events/admin/all",
+                                "/api/events/admin/pending"
+                        ).authenticated()
+
+                        .requestMatchers(HttpMethod.PUT,
+                                "/api/events/approve/**",
+                                "/api/events/reject/**"
+                        ).authenticated()
+
+                        // =========================
+                        // BOOKING APIs
+                        // =========================
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/bookings/book"
+                        ).authenticated()
+
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/bookings/my-bookings",
+                                "/api/bookings/organizer-bookings",
+                                "/api/bookings/organizer-bookings/**",
+                                "/api/bookings/all",
+                                "/api/bookings/event/**",
+                                "/api/bookings/user/**",
+                                "/api/bookings/*"
+                        ).authenticated()
+
+                        .requestMatchers(HttpMethod.PUT,
+                                "/api/bookings/cancel/**",
+                                "/api/bookings/admin/cancel/**"
+                        ).authenticated()
+
+                        // =========================
+                        // USER MANAGEMENT
+                        // =========================
+                        .requestMatchers("/api/users/all").authenticated()
 
                         .anyRequest().authenticated()
                 )

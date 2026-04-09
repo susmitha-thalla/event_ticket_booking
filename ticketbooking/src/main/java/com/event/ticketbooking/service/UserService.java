@@ -10,8 +10,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 public class UserService {
@@ -27,66 +27,145 @@ public class UserService {
     // REGISTER USER / ORGANIZER / ADMIN
     public String registerUser(RegisterRequest request) {
 
-        // Check if email already exists
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+        if (request == null || !request.isValid()) {
+            return "Invalid registration data";
+        }
+
+        String email = request.getEmail().trim().toLowerCase();
+
+        if (userRepository.findByEmail(email).isPresent()) {
             return "Email already exists!";
         }
 
         User user = new User();
-        user.setFullName(request.getFullName());
-        user.setEmail(request.getEmail());
-        user.setPasswordHash(encoder.encode(request.getPassword())); // encrypted password
+        user.setFullName(request.getFullName().trim());
+        user.setEmail(email);
+        user.setPasswordHash(encoder.encode(request.getPassword()));
         user.setPhone(request.getPhone());
 
-        // Allow USER, ORGANIZER, ADMIN
-        String role;
-        if (request.getRole() == null || request.getRole().trim().isEmpty()) {
-            role = "USER";
-        } else if (request.getRole().equalsIgnoreCase("ORGANIZER")) {
-            role = "ORGANIZER";
-        } else if (request.getRole().equalsIgnoreCase("ADMIN")) {
-            role = "ADMIN";
-        } else {
-            role = "USER";
-        }
-
+        // Normalize and save valid role
+        String role = normalizeRole(request.getSafeRole());
         user.setRole(role);
+
         user.setAccountStatus("ACTIVE");
-        user.setCreatedAt(LocalDateTime.now());
-        user.setUpdatedAt(LocalDateTime.now());
+        user.setIsDeleted(false);
 
         userRepository.save(user);
 
-        if (role.equals("ORGANIZER")) {
-            return "Organizer Registered Successfully";
-        } else if (role.equals("ADMIN")) {
-            return "Admin Registered Successfully";
-        } else {
-            return "User Registered Successfully";
-        }
+        return switch (role) {
+            case "ADMIN" -> "Admin registered successfully";
+            case "ORGANIZER" -> "Organizer registered successfully";
+            default -> "User registered successfully";
+        };
     }
 
     // LOGIN USER / ORGANIZER / ADMIN
     public LoginResponse loginUser(LoginRequest request) {
 
-        User user = userRepository.findByEmail(request.getEmail())
+        if (request == null || !request.isValid()) {
+            throw new RuntimeException("Invalid login data");
+        }
+
+        String email = request.getEmail().trim().toLowerCase();
+
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (Boolean.TRUE.equals(user.getIsDeleted())) {
+            throw new RuntimeException("Account is deleted");
+        }
+
+        if (user.getAccountStatus() != null &&
+                !"ACTIVE".equalsIgnoreCase(user.getAccountStatus())) {
+            throw new RuntimeException("Account is not active");
+        }
 
         if (!encoder.matches(request.getPassword(), user.getPasswordHash())) {
             throw new RuntimeException("Invalid password");
         }
 
-        String token = jwtUtil.generateToken(user.getEmail());
+        String actualRole = normalizeRole(user.getRole());
 
-        return new LoginResponse(
-                "Login Successful",
+        // Optional role check if frontend sends role
+        if (request.getRole() != null && !request.getRole().isBlank()) {
+            String requestedRole = normalizeRole(request.getRole());
+            if (!actualRole.equals(requestedRole)) {
+                throw new RuntimeException("Role mismatch");
+            }
+        }
+
+        user.setRole(actualRole); // keep DB/user object normalized
+        user.updateLastLogin();
+        userRepository.save(user);
+
+        String token = jwtUtil.generateTokenWithRole(user.getEmail(), actualRole);
+
+        String message = switch (actualRole) {
+            case "ADMIN" -> "Admin logged in successfully";
+            case "ORGANIZER" -> "Organizer logged in successfully";
+            default -> "User logged in successfully";
+        };
+
+        LoginResponse response = new LoginResponse(
+                message,
                 token,
-                user.getRole(),
-                user.getEmail()
+                actualRole,
+                user.getEmail(),
+                user.getUserId(),
+                user.getUserCode(),
+                user.getAccountStatus()
         );
+
+        response.setTokenType("Bearer");
+        response.setExpiresIn(null);
+
+        return response;
     }
 
     public List<User> getAllUsers() {
-        return userRepository.findAll();
+        return userRepository.findAll()
+                .stream()
+                .filter(user -> !Boolean.TRUE.equals(user.getIsDeleted()))
+                .toList();
+    }
+
+    public User getUserById(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+    }
+
+    public String blockUser(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        user.markBlocked();
+        userRepository.save(user);
+
+        return "User blocked successfully";
+    }
+
+    public String softDeleteUser(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        user.markDeleted();
+        userRepository.save(user);
+
+        return "User deleted successfully";
+    }
+
+    private String normalizeRole(String role) {
+        if (role == null || role.isBlank()) {
+            return "USER";
+        }
+
+        String normalized = role.trim().toUpperCase(Locale.ROOT);
+
+        return switch (normalized) {
+            case "ADMIN" -> "ADMIN";
+            case "ORGANIZER", "ORGANISER", "ORAGANIZER", "ORAGANISER" -> "ORGANIZER";
+            case "USER", "USERS" -> "USER";
+            default -> "USER";
+        };
     }
 }
