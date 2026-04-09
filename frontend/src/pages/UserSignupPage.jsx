@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { registerUser } from "../services/authService";
+import { useNavigate } from "react-router-dom";
+import { loginUser, registerUser } from "../services/authService";
 import Navbar from "../components/Navbar";
 
 function UserSignupPage() {
+  const navigate = useNavigate();
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -22,14 +24,32 @@ function UserSignupPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await registerUser(form);
-setMessage(typeof response === "string" ? response : "Signup successful");
+      await registerUser(form);
+      setMessage("Signup successful. Logging you in...");
+
+      const loginResponse = await loginUser({
+        email: form.email,
+        password: form.password,
+        role: "USER",
+      });
+
+      const token = loginResponse?.token || loginResponse?.accessToken || loginResponse?.jwt;
+      if (!token) {
+        throw new Error("Login token missing after signup.");
+      }
+
+      localStorage.setItem("token", token);
+      localStorage.setItem("role", loginResponse?.role || "USER");
+      localStorage.setItem("email", loginResponse?.email || form.email);
+      sessionStorage.setItem("welcome_user", form.fullName || "User");
+
+      navigate("/events");
     } catch (error) {
-  console.error(error);
-  setErrorMsg(
-    error.response?.data || error.message || "Signup failed"
-  );
-}
+      console.error(error);
+      setErrorMsg(
+        error.response?.data || error.message || "Signup failed"
+      );
+    }
   };
 
   return (

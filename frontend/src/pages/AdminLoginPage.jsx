@@ -17,7 +17,10 @@ function AdminLoginPage() {
     e.preventDefault();
 
     try {
-      const response = await loginUser(form);
+      const response = await loginUser({
+        ...form,
+        role: "ADMIN",
+      });
       const token = response?.token || response?.accessToken || response?.jwt;
       if (!token) {
         setErrorMsg("Login response is missing token. Please try again.");

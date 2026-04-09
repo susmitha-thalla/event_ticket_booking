@@ -30,6 +30,7 @@ function EventsPage() {
   const [end, setEnd] = useState("");
   const [loading, setLoading] = useState(false);
   const [activeView, setActiveView] = useState("ALL");
+  const [welcomeMessage, setWelcomeMessage] = useState("");
   const navigate = useNavigate();
 
   const loadEvents = async () => {
@@ -47,6 +48,17 @@ function EventsPage() {
 
   useEffect(() => {
     loadEvents();
+  }, []);
+
+  useEffect(() => {
+    const name = sessionStorage.getItem("welcome_user");
+    if (!name) return;
+
+    setWelcomeMessage(`Welcome, ${name}. Your account is ready.`);
+    sessionStorage.removeItem("welcome_user");
+
+    const timer = setTimeout(() => setWelcomeMessage(""), 2800);
+    return () => clearTimeout(timer);
   }, []);
 
   const handleCategoryFilter = async () => {
@@ -112,6 +124,7 @@ function EventsPage() {
     <>
       <Navbar />
       <div className="container">
+        {welcomeMessage && <div className="welcome-banner">{welcomeMessage}</div>}
         <div className="page-header">
           <h1 className="page-title">Explore Events</h1>
           <p className="page-subtitle">

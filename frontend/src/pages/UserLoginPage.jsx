@@ -16,7 +16,10 @@ function UserLoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await loginUser(form);
+      const response = await loginUser({
+        ...form,
+        role: "USER",
+      });
       const token = response?.token || response?.accessToken || response?.jwt;
       if (!token) {
         setErrorMsg("Login response is missing token. Please try again.");

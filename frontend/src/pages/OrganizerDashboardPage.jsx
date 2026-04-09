@@ -1,11 +1,26 @@
+import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import { Link } from "react-router-dom";
 
 function OrganizerDashboardPage() {
+  const [welcomeMessage, setWelcomeMessage] = useState("");
+
+  useEffect(() => {
+    const name = sessionStorage.getItem("welcome_organizer");
+    if (!name) return;
+
+    setWelcomeMessage(`Welcome, ${name}. Your organizer dashboard is ready.`);
+    sessionStorage.removeItem("welcome_organizer");
+
+    const timer = setTimeout(() => setWelcomeMessage(""), 2800);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <>
       <Navbar />
       <div className="container">
+        {welcomeMessage && <div className="welcome-banner">{welcomeMessage}</div>}
         <div className="page-header">
           <h1 className="page-title">Organizer Dashboard</h1>
           <p className="page-subtitle">Create events, review approvals, and track bookings.</p>

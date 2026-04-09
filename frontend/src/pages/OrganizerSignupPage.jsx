@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { registerUser } from "../services/authService";
+import { useNavigate } from "react-router-dom";
+import { loginUser, registerUser } from "../services/authService";
 import Navbar from "../components/Navbar";
 
 function OrganizerSignupPage() {
+  const navigate = useNavigate();
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -22,8 +24,26 @@ function OrganizerSignupPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await registerUser(form);
-      setMessage(response);
+      await registerUser(form);
+      setMessage("Signup successful. Logging you in...");
+
+      const loginResponse = await loginUser({
+        email: form.email,
+        password: form.password,
+        role: "ORGANIZER",
+      });
+
+      const token = loginResponse?.token || loginResponse?.accessToken || loginResponse?.jwt;
+      if (!token) {
+        throw new Error("Login token missing after signup.");
+      }
+
+      localStorage.setItem("token", token);
+      localStorage.setItem("role", loginResponse?.role || "ORGANIZER");
+      localStorage.setItem("email", loginResponse?.email || form.email);
+      sessionStorage.setItem("welcome_organizer", form.fullName || "Organizer");
+
+      navigate("/organizer/dashboard");
     } catch (error) {
       console.error(error);
       setErrorMsg(error.response?.data || "Organizer signup failed");
