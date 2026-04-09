@@ -3,10 +3,13 @@ import { useState } from "react";
 import { bookTicket } from "../services/bookingService";
 import Navbar from "../components/Navbar";
 
+const formatAmount = (value) => Number(value || 0).toFixed(2);
+
 function BookingPage() {
   const locationHook = useLocation();
   const navigate = useNavigate();
   const event = locationHook.state?.event;
+  const requiresSeatSelection = Boolean(event?.hasSeats);
 
   const [form, setForm] = useState({
     eventId: event?.eventId || "",
@@ -40,8 +43,18 @@ function BookingPage() {
   const openPaymentModal = (e) => {
     e.preventDefault();
 
-    if (!form.quantity || !form.seatNumbers || !form.gender || !form.paymentMode) {
+    if (!form.gender || !form.paymentMode) {
       alert("Please fill all details and select payment mode.");
+      return;
+    }
+
+    if (requiresSeatSelection && !form.seatNumbers.trim()) {
+      alert("Please enter seat numbers for this event.");
+      return;
+    }
+
+    if (!requiresSeatSelection && (!form.quantity || Number(form.quantity) <= 0)) {
+      alert("Please enter a valid ticket quantity.");
       return;
     }
 
@@ -54,9 +67,25 @@ function BookingPage() {
 
     setTimeout(async () => {
       try {
+        const parsedSeatNumbers = form.seatNumbers
+          .split(",")
+          .map((seat) => seat.trim().toUpperCase())
+          .filter(Boolean);
+
+        const payload = {
+          eventId: Number(form.eventId),
+          gender: form.gender,
+          paymentMode: form.paymentMode,
+        };
+
+        if (requiresSeatSelection) {
+          payload.seatNumbers = parsedSeatNumbers;
+        } else {
+          payload.quantity = Number(form.quantity);
+        }
+
         const response = await bookTicket({
-          ...form,
-          quantity: Number(form.quantity),
+          ...payload,
         });
 
         setProcessingPayment(false);
@@ -82,24 +111,31 @@ function BookingPage() {
 
           <p><strong>{event.title}</strong></p>
           <p className="subtext">{event.location} • {event.category}</p>
-          <p><strong>Price per ticket:</strong> ₹{event.price}</p>
+          <p><strong>Price per ticket:</strong> ₹{formatAmount(event.price)}</p>
+          <p><strong>Seat Selection:</strong> {requiresSeatSelection ? "Required" : "Not Required"}</p>
 
           <form onSubmit={openPaymentModal}>
-            <input
-              name="quantity"
-              placeholder="No. of Tickets"
-              value={form.quantity}
-              onChange={handleChange}
-              required
-            />
+            {!requiresSeatSelection && (
+              <input
+                name="quantity"
+                type="number"
+                min="1"
+                placeholder="No. of Tickets"
+                value={form.quantity}
+                onChange={handleChange}
+                required
+              />
+            )}
 
-            <input
-              name="seatNumbers"
-              placeholder="Seat numbers (A1,A2)"
-              value={form.seatNumbers}
-              onChange={handleChange}
-              required
-            />
+            {requiresSeatSelection && (
+              <input
+                name="seatNumbers"
+                placeholder="Seat numbers (A1,A2)"
+                value={form.seatNumbers}
+                onChange={handleChange}
+                required
+              />
+            )}
 
             <select
               name="gender"
@@ -124,6 +160,8 @@ function BookingPage() {
               <option value="">Select Payment Mode</option>
               <option value="UPI">UPI</option>
               <option value="CARD">Card</option>
+              <option value="NETBANKING">Net Banking</option>
+              <option value="CASH">Cash</option>
             </select>
 
             <button type="submit">Pay Now</button>
@@ -146,7 +184,18 @@ function BookingPage() {
         >
           <div className="card" style={{ maxWidth: "420px", width: "100%", textAlign: "center" }}>
             <h2>Secure Payment</h2>
-            <p><strong>Amount:</strong> ₹{Number(form.quantity || 0) * Number(event.price || 0)}</p>
+            <p>
+              <strong>Amount:</strong> ₹{
+                requiresSeatSelection
+                  ? formatAmount(
+                      form.seatNumbers
+                        .split(",")
+                        .map((seat) => seat.trim())
+                        .filter(Boolean).length * Number(event.price || 0)
+                    )
+                  : formatAmount(Number(form.quantity || 0) * Number(event.price || 0))
+              }
+            </p>
             <p><strong>Payment Mode:</strong> {form.paymentMode}</p>
 
             {!processingPayment && form.paymentMode === "UPI" && (
@@ -174,6 +223,12 @@ function BookingPage() {
                   💳 Pay with Card
                 </button>
               </>
+            )}
+
+            {!processingPayment && (form.paymentMode === "NETBANKING" || form.paymentMode === "CASH") && (
+              <button type="button" onClick={() => handleFakePayment(form.paymentMode)}>
+                Continue
+              </button>
             )}
 
             {!processingPayment && (

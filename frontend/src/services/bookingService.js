@@ -19,3 +19,13 @@ export const getAllBookings = async () => {
   const response = await api.get("/bookings/all");
   return response.data;
 };
+
+export const cancelMyBooking = async (bookingId) => {
+  const response = await api.put(`/bookings/cancel/${bookingId}`);
+  return response.data;
+};
+
+export const cancelBookingByAdmin = async (bookingId) => {
+  const response = await api.put(`/bookings/admin/cancel/${bookingId}`);
+  return response.data;
+};

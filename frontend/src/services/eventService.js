@@ -39,3 +39,18 @@ export const approveEvent = async (eventId) => {
   const response = await api.post(`/events/approve/${eventId}`);
   return response.data;
 };
+
+export const getLiveEvents = async () => {
+  const response = await api.get("/events/live");
+  return response.data;
+};
+
+export const getStartingSoonEvents = async () => {
+  const response = await api.get("/events/starting-soon");
+  return response.data;
+};
+
+export const deleteEvent = async (eventId) => {
+  const response = await api.delete(`/events/${eventId}`);
+  return response.data;
+};

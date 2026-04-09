@@ -8,6 +8,15 @@ import {
 } from "../services/eventService";
 import Navbar from "../components/Navbar";
 
+const formatDateTime = (value) => {
+  if (!value) return "N/A";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString();
+};
+
+const formatAmount = (value) => Number(value || 0).toFixed(2);
+
 function EventsPage() {
   const [events, setEvents] = useState([]);
   const [category, setCategory] = useState("");
@@ -113,7 +122,7 @@ function EventsPage() {
             <div>
               <label className="label">Start Date</label>
               <input
-                placeholder="2026-04-01T00:00:00"
+                type="datetime-local"
                 value={start}
                 onChange={(e) => setStart(e.target.value)}
               />
@@ -122,7 +131,7 @@ function EventsPage() {
             <div>
               <label className="label">End Date</label>
               <input
-                placeholder="2026-04-30T23:59:59"
+                type="datetime-local"
                 value={end}
                 onChange={(e) => setEnd(e.target.value)}
               />
@@ -156,13 +165,19 @@ function EventsPage() {
                   <strong>Category:</strong> {event.category}
                 </div>
                 <div className="info-row">
-                  <strong>Date:</strong> {event.eventDate}
+                  <strong>Date:</strong> {formatDateTime(event.eventDate)}
                 </div>
                 <div className="info-row">
-                  <strong>Price:</strong> ₹{event.price}
+                  <strong>Price:</strong> ₹{formatAmount(event.price)}
                 </div>
                 <div className="info-row">
                   <strong>Seats Available:</strong> {event.availableSeats}
+                </div>
+                <div className="info-row">
+                  <strong>Event Status:</strong> {event.eventStatus || "UPCOMING"}
+                </div>
+                <div className="info-row">
+                  <strong>Seat Selection:</strong> {event.hasSeats ? "Yes" : "No"}
                 </div>
 
                 <button
