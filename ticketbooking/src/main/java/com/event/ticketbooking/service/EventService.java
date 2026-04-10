@@ -15,6 +15,11 @@ import java.util.Locale;
 
 @Service
 public class EventService {
+    private static final int TITLE_MAX = 255;
+    private static final int DESCRIPTION_MAX = 255;
+    private static final int LOCATION_MAX = 255;
+    private static final int CATEGORY_MAX = 255;
+    private static final int WALLPAPER_URL_MAX = 1200;
 
     @Autowired
     private EventRepository eventRepository;
@@ -37,14 +42,14 @@ public class EventService {
         }
 
         Event event = new Event();
-        event.setTitle(request.getTitle());
-        event.setDescription(request.getDescription());
-        event.setLocation(request.getLocation());
-        event.setCategory(request.getCategory());
+        event.setTitle(sanitize(request.getTitle(), TITLE_MAX));
+        event.setDescription(sanitize(request.getDescription(), DESCRIPTION_MAX));
+        event.setLocation(sanitize(request.getLocation(), LOCATION_MAX));
+        event.setCategory(sanitize(request.getCategory(), CATEGORY_MAX));
         event.setEventDate(request.getEventDate());
         event.setPrice(request.getPrice());
         event.setAvailableSeats(request.getAvailableSeats());
-        event.setWallpaperUrl(request.getWallpaperUrl());
+        event.setWallpaperUrl(sanitize(request.getWallpaperUrl(), WALLPAPER_URL_MAX));
         event.setCreatedBy(user.getEmail());
         event.setApprovalStatus("PENDING");
         event.setOrganizerPaid(true);
@@ -243,5 +248,16 @@ public class EventService {
             case "ORGANIZER", "ORGANISER", "ORAGANIZER", "ORAGANISER" -> "ORGANIZER";
             default -> "USER";
         };
+    }
+
+    private String sanitize(String value, int maxLength) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.length() <= maxLength) {
+            return trimmed;
+        }
+        return trimmed.substring(0, maxLength);
     }
 }

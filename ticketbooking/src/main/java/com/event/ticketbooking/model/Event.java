@@ -11,24 +11,42 @@ public class Event {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long eventId;
 
+    @Column(nullable = false, length = 255)
     private String title;
+
+    @Column(columnDefinition = "TEXT")
     private String description;
+
+    @Column(length = 255)
     private String location;
+
     private LocalDateTime eventDate;
     private Double price;
     private Integer availableSeats;
+
     @Column(length = 1200)
     private String wallpaperUrl;
 
+    @Column(length = 255)
     private String createdBy; // organizer email
+
+    @Column(length = 100)
     private String category; // MUSIC, TECH, SPORTS etc
+
+    @Column(length = 50)
     private String approvalStatus; // PENDING / APPROVED
+
     private Boolean organizerPaid;
 
     // NEW FIELDS FOR UPGRADE
     private Boolean hasSeats;
+
+    @Column(length = 50)
     private String recurrenceType; // NONE / DAILY / WEEKLY / MONTHLY
+
+    @Column(length = 50)
     private String eventStatus; // UPCOMING / LIVE / ENDED / DELETED
+
     private Boolean isDeleted;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

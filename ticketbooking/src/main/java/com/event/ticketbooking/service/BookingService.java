@@ -85,7 +85,10 @@ public class BookingService {
             throw new RuntimeException("Quantity must be greater than 0");
         }
 
-        if (event.getAvailableSeats() == null || event.getAvailableSeats() < quantity) {
+        // For non-seat events rely on event-level inventory.
+        // For seat-based events availability is validated per selected seat below.
+        if (!Boolean.TRUE.equals(event.getHasSeats()) &&
+                (event.getAvailableSeats() == null || event.getAvailableSeats() < quantity)) {
             throw new RuntimeException("Not enough seats/tickets available");
         }
 
