@@ -59,7 +59,7 @@ public class SecurityConfig {
                         // =========================
                         .requestMatchers(HttpMethod.POST,
                                 "/api/events/create"
-                        ).hasAnyAuthority("ROLE_ORGANIZER", "ROLE_ADMIN")
+                        ).authenticated()
 
                         .requestMatchers(HttpMethod.POST,
                                 "/api/uploads/wallpaper"
@@ -98,7 +98,7 @@ public class SecurityConfig {
                         // =========================
                         .requestMatchers(HttpMethod.POST,
                                 "/api/bookings/book"
-                        ).hasAuthority("ROLE_USER")
+                        ).authenticated()
 
                         .requestMatchers(HttpMethod.GET,
                                 "/api/bookings/my-bookings",
