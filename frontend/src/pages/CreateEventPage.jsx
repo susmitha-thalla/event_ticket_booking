@@ -62,12 +62,6 @@ function CreateEventPage() {
 
   const handleCreate = async (e) => {
     e.preventDefault();
-    const role = (localStorage.getItem("role") || "").toUpperCase();
-    if (role !== "ORGANIZER" && role !== "ROLE_ORGANIZER") {
-      alert("Please login with an ORGANIZER account to create events.");
-      navigate("/organizer/login");
-      return;
-    }
 
     if (form.hasSeats && generatedSeats.length === 0) {
       alert("Please select seat layout size for a seat-based event.");
@@ -234,7 +228,13 @@ function CreateEventPage() {
           <h2>Create Event</h2>
           <form onSubmit={handleCreate}>
             <input name="title" placeholder="Title" onChange={handleChange} required />
-            <input name="description" placeholder="Description" onChange={handleChange} required />
+            <input
+              name="description"
+              placeholder="Description (max 255 chars)"
+              maxLength={255}
+              onChange={handleChange}
+              required
+            />
             <input name="location" placeholder="Location" onChange={handleChange} required />
             <input name="category" placeholder="Category" onChange={handleChange} required />
             <input
