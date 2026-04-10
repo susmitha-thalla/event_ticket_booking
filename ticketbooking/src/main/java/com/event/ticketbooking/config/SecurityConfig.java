@@ -31,6 +31,7 @@ public class SecurityConfig {
                         // PUBLIC AUTH
                         // =========================
                         .requestMatchers("/api/users/register", "/api/users/login").permitAll()
+                        .requestMatchers("/error").permitAll()
                         .requestMatchers("/generated_qr/**").permitAll()
                         .requestMatchers("/wallpapers/**").permitAll()
 
@@ -58,7 +59,7 @@ public class SecurityConfig {
                         // =========================
                         .requestMatchers(HttpMethod.POST,
                                 "/api/events/create"
-                        ).authenticated()
+                        ).hasAnyAuthority("ROLE_ORGANIZER", "ROLE_ADMIN")
 
                         .requestMatchers(HttpMethod.POST,
                                 "/api/uploads/wallpaper"
@@ -97,7 +98,7 @@ public class SecurityConfig {
                         // =========================
                         .requestMatchers(HttpMethod.POST,
                                 "/api/bookings/book"
-                        ).authenticated()
+                        ).hasAuthority("ROLE_USER")
 
                         .requestMatchers(HttpMethod.GET,
                                 "/api/bookings/my-bookings",
