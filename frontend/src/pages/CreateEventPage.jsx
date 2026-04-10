@@ -62,6 +62,12 @@ function CreateEventPage() {
 
   const handleCreate = async (e) => {
     e.preventDefault();
+    const role = (localStorage.getItem("role") || "").toUpperCase();
+    if (role !== "ORGANIZER" && role !== "ROLE_ORGANIZER") {
+      alert("Please login with an ORGANIZER account to create events.");
+      navigate("/organizer/login");
+      return;
+    }
 
     if (form.hasSeats && generatedSeats.length === 0) {
       alert("Please select seat layout size for a seat-based event.");
