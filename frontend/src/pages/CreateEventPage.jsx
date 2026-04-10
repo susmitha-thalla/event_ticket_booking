@@ -199,15 +199,20 @@ function CreateEventPage() {
 
       const looksLikeAuthError =
         status === 401 ||
-        status === 403 ||
         /status code 401/i.test(errorMessage) ||
-        /status code 403/i.test(errorMessage) ||
-        /forbidden/i.test(errorMessage) ||
         /unauthorized/i.test(errorMessage);
 
       if (looksLikeAuthError) {
         alert(`Authorization failed (${status}). Please login again as organizer.`);
         navigate("/organizer/login");
+        return;
+      }
+
+      if (status === 403) {
+        alert(
+          "Forbidden (403): your account/token is valid for login but not allowed to create events. " +
+          "Login with organizer account and try again."
+        );
         return;
       }
 

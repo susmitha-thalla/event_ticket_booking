@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import java.security.Principal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 public class EventService {
@@ -22,14 +23,16 @@ public class EventService {
     private UserRepository userRepository;
 
     public Event createEvent(EventRequest request, Principal principal) {
+        if (principal == null || principal.getName() == null || principal.getName().isBlank()) {
+            throw new RuntimeException("Unauthorized request");
+        }
 
         String email = principal.getName();
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        if (!"ORGANIZER".equalsIgnoreCase(user.getRole()) &&
-                !"ROLE_ORGANIZER".equalsIgnoreCase(user.getRole())) {
+        if (!isOrganizer(user) && !isAdmin(user)) {
             throw new RuntimeException("Only organizers can create events");
         }
 
@@ -46,7 +49,6 @@ public class EventService {
         event.setApprovalStatus("PENDING");
         event.setOrganizerPaid(true);
 
-        // new upgrade fields
         event.setHasSeats(request.getHasSeats() != null ? request.getHasSeats() : false);
         event.setRecurrenceType(request.getRecurrenceType() != null ? request.getRecurrenceType() : "NONE");
         event.setEventStatus(calculateEventStatus(request.getEventDate()));
@@ -167,8 +169,7 @@ public class EventService {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new RuntimeException("Event not found"));
 
-        boolean isAdmin = "ADMIN".equalsIgnoreCase(user.getRole()) ||
-                "ROLE_ADMIN".equalsIgnoreCase(user.getRole());
+        boolean isAdmin = isAdmin(user);
 
         boolean isOwner = event.getCreatedBy() != null &&
                 event.getCreatedBy().equalsIgnoreCase(email);
@@ -213,5 +214,34 @@ public class EventService {
         } else {
             return "LIVE";
         }
+    }
+
+    private boolean isOrganizer(User user) {
+        if (user == null) return false;
+        String role = normalizeRole(user.getRole());
+        return "ORGANIZER".equals(role);
+    }
+
+    private boolean isAdmin(User user) {
+        if (user == null) return false;
+        String role = normalizeRole(user.getRole());
+        return "ADMIN".equals(role);
+    }
+
+    private String normalizeRole(String role) {
+        if (role == null || role.isBlank()) {
+            return "USER";
+        }
+
+        String normalized = role.trim().toUpperCase(Locale.ROOT);
+        if (normalized.startsWith("ROLE_")) {
+            normalized = normalized.substring(5);
+        }
+
+        return switch (normalized) {
+            case "ADMIN" -> "ADMIN";
+            case "ORGANIZER", "ORGANISER", "ORAGANIZER", "ORAGANISER" -> "ORGANIZER";
+            default -> "USER";
+        };
     }
 }

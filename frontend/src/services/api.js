@@ -51,9 +51,7 @@ api.interceptors.response.use(
     const status = error?.response?.status;
     const looksLikeAuthError =
       status === 401 ||
-      status === 403 ||
-      /status code 401/i.test(error?.message || "") ||
-      /status code 403/i.test(error?.message || "");
+      /status code 401/i.test(error?.message || "");
 
     if (looksLikeAuthError) {
       const existingToken = getStoredToken();
