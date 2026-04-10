@@ -2,12 +2,26 @@ import api from "./api";
 import { getAuthHeader } from "./authHeader";
 
 export const bookTicket = async (data) => {
-  const response = await api.post("/bookings/book", data, {
-    headers: {
-      ...getAuthHeader(),
-    },
-  });
-  return response.data;
+  try {
+    const response = await api.post("/bookings/book", data, {
+      headers: {
+        ...getAuthHeader(),
+      },
+    });
+    return response.data;
+  } catch (error) {
+    const status = error?.response?.status;
+    if (status !== 401 && status !== 403) {
+      throw error;
+    }
+
+    const retryResponse = await api.post("/bookings/book", data, {
+      headers: {
+        ...getAuthHeader(),
+      },
+    });
+    return retryResponse.data;
+  }
 };
 
 export const getMyBookings = async () => {

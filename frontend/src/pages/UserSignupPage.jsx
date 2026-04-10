@@ -24,7 +24,16 @@ function UserSignupPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await registerUser(form);
+      const registerResponse = await registerUser(form);
+      const registerMessage =
+        typeof registerResponse === "string"
+          ? registerResponse
+          : registerResponse?.message || "";
+
+      if (!/registered successfully/i.test(registerMessage)) {
+        throw new Error(registerMessage || "Signup failed");
+      }
+
       setMessage("Signup successful. Logging you in...");
 
       const loginResponse = await loginUser({
