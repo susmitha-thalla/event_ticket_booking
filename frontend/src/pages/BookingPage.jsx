@@ -5,12 +5,13 @@ import { getSeatMapByEvent } from "../services/seatService";
 import Navbar from "../components/Navbar";
 
 const formatAmount = (value) => Number(value || 0).toFixed(2);
+const toBoolean = (value) => value === true || value === "true" || value === 1 || value === "1";
 
 function BookingPage() {
   const locationHook = useLocation();
   const navigate = useNavigate();
   const event = locationHook.state?.event;
-  const requiresSeatSelection = Boolean(event?.hasSeats);
+  const requiresSeatSelection = toBoolean(event?.hasSeats);
 
   const [form, setForm] = useState({
     eventId: event?.eventId || "",

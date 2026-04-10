@@ -2,6 +2,7 @@ package com.event.ticketbooking.model;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "events")
@@ -10,6 +11,9 @@ public class Event {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long eventId;
+
+    @Column(name = "event_code", nullable = false, unique = true, length = 50)
+    private String eventCode;
 
     @Column(nullable = false, length = 255)
     private String title;
@@ -60,6 +64,10 @@ public class Event {
         this.createdAt = now;
         this.updatedAt = now;
 
+        if (this.eventCode == null || this.eventCode.isBlank()) {
+            this.eventCode = generateEventCode();
+        }
+
         if (this.hasSeats == null) this.hasSeats = false;
         if (this.recurrenceType == null) this.recurrenceType = "NONE";
         if (this.eventStatus == null) this.eventStatus = "UPCOMING";
@@ -73,12 +81,24 @@ public class Event {
         this.updatedAt = LocalDateTime.now();
     }
 
+    private String generateEventCode() {
+        return "EVT-" + UUID.randomUUID().toString().replace("-", "").substring(0, 10).toUpperCase();
+    }
+
     public Long getEventId() {
         return eventId;
     }
 
     public void setEventId(Long eventId) {
         this.eventId = eventId;
+    }
+
+    public String getEventCode() {
+        return eventCode;
+    }
+
+    public void setEventCode(String eventCode) {
+        this.eventCode = eventCode;
     }
 
     public String getTitle() {

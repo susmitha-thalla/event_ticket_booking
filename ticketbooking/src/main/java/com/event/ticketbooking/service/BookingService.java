@@ -80,6 +80,11 @@ public class BookingService {
             throw new RuntimeException("Tickets can only be booked for upcoming or live events");
         }
 
+        if (!Boolean.TRUE.equals(event.getHasSeats()) &&
+                (request.getQuantity() == null || request.getQuantity() <= 0)) {
+            throw new RuntimeException("Please enter a valid number of tickets");
+        }
+
         int quantity = request.getFinalQuantity();
         if (quantity <= 0) {
             throw new RuntimeException("Quantity must be greater than 0");
