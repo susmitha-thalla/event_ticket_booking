@@ -19,6 +19,7 @@ import java.security.Principal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 @Service
@@ -44,6 +45,10 @@ public class BookingService {
 
     @Transactional
     public Booking bookTicket(BookingRequest request, Principal principal) {
+        if (principal == null || principal.getName() == null || principal.getName().isBlank()) {
+            throw new RuntimeException("Unauthorized request");
+        }
+
         String email = principal.getName();
 
         User user = userRepository.findByEmail(email)
@@ -193,6 +198,10 @@ public class BookingService {
 
     @Transactional
     public String cancelBooking(Long bookingId, Principal principal) {
+        if (principal == null || principal.getName() == null || principal.getName().isBlank()) {
+            throw new RuntimeException("Unauthorized request");
+        }
+
         String email = principal.getName();
 
         User user = userRepository.findByEmail(email)
@@ -329,16 +338,31 @@ public class BookingService {
     }
 
     private boolean isNormalUser(User user) {
-        return user != null && (
-                "USER".equalsIgnoreCase(user.getRole()) ||
-                        "ROLE_USER".equalsIgnoreCase(user.getRole())
-        );
+        if (user == null) return false;
+        String role = normalizeRole(user.getRole());
+        return "USER".equals(role);
     }
 
     private boolean isAdmin(User user) {
-        return user != null && (
-                "ADMIN".equalsIgnoreCase(user.getRole()) ||
-                        "ROLE_ADMIN".equalsIgnoreCase(user.getRole())
-        );
+        if (user == null) return false;
+        String role = normalizeRole(user.getRole());
+        return "ADMIN".equals(role);
+    }
+
+    private String normalizeRole(String role) {
+        if (role == null || role.isBlank()) {
+            return "USER";
+        }
+
+        String normalized = role.trim().toUpperCase(Locale.ROOT);
+        if (normalized.startsWith("ROLE_")) {
+            normalized = normalized.substring(5);
+        }
+
+        return switch (normalized) {
+            case "ADMIN" -> "ADMIN";
+            case "ORGANIZER", "ORGANISER", "ORAGANIZER", "ORAGANISER" -> "ORGANIZER";
+            default -> "USER";
+        };
     }
 }
