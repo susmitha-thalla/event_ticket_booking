@@ -112,27 +112,52 @@ function BookingPage() {
 
     setTimeout(async () => {
       try {
-        const payload = {
+        const basePayload = {
           eventId: Number(form.eventId),
           gender: form.gender,
           paymentMode: form.paymentMode,
         };
 
         if (requiresSeatSelection) {
-          payload.seatNumbers = selectedSeats;
-          payload.quantity = selectedSeats.length;
+          if (selectedSeats.length === 1) {
+            const singleSeatBooking = await bookTicket({
+              ...basePayload,
+              seatNumbers: [selectedSeats[0]],
+              quantity: 1,
+            });
+
+            setProcessingPayment(false);
+            setShowPaymentModal(false);
+            navigate("/booking-success", { state: { booking: singleSeatBooking } });
+            return;
+          }
+
+          const bookingResponses = [];
+          for (const seatCode of selectedSeats) {
+            const bookingResponse = await bookTicket({
+              ...basePayload,
+              seatNumbers: [seatCode],
+              quantity: 1,
+            });
+            bookingResponses.push(bookingResponse);
+          }
+
+          setProcessingPayment(false);
+          setShowPaymentModal(false);
+          alert(`Booked ${bookingResponses.length} tickets successfully.`);
+          navigate("/my-bookings");
+          return;
         } else {
-          payload.quantity = Number(form.quantity);
+          const response = await bookTicket({
+            ...basePayload,
+            quantity: Number(form.quantity),
+          });
+
+          setProcessingPayment(false);
+          setShowPaymentModal(false);
+          navigate("/booking-success", { state: { booking: response } });
+          return;
         }
-
-        const response = await bookTicket({
-          ...payload,
-        });
-
-        setProcessingPayment(false);
-        setShowPaymentModal(false);
-
-        navigate("/booking-success", { state: { booking: response } });
       } catch (error) {
         setProcessingPayment(false);
         setShowPaymentModal(false);
