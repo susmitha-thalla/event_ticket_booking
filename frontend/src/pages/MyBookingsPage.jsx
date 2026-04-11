@@ -1,24 +1,57 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { getMyBookings } from "../services/bookingService";
 import Navbar from "../components/Navbar";
 
+const getArrayFromPayload = (payload, keys = []) => {
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== "object") return [];
+
+  for (const key of keys) {
+    if (Array.isArray(payload[key])) return payload[key];
+  }
+
+  if (Array.isArray(payload.data)) return payload.data;
+  if (payload.data && typeof payload.data === "object") {
+    for (const key of keys) {
+      if (Array.isArray(payload.data[key])) return payload.data[key];
+    }
+  }
+
+  return [];
+};
+
 function MyBookingsPage() {
   const [bookings, setBookings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+  const navigate = useNavigate();
 
   useEffect(() => {
     const loadBookings = async () => {
       try {
+        setLoading(true);
+        setErrorMessage("");
         const data = await getMyBookings();
-        console.log("Bookings data:", data);
-        setBookings(data);
+        const bookingList = getArrayFromPayload(data, ["bookings", "content", "items", "results"]);
+        setBookings(bookingList);
       } catch (error) {
         console.error(error);
-        alert("Failed to load bookings");
+        const status = error?.response?.status;
+        if (status === 401 || status === 403) {
+          setErrorMessage("Session expired. Please login again.");
+          navigate("/user/login");
+          return;
+        }
+
+        setErrorMessage("Failed to load bookings right now. Please try again.");
+      } finally {
+        setLoading(false);
       }
     };
 
     loadBookings();
-  }, []);
+  }, [navigate]);
 
   return (
     <>
@@ -31,21 +64,34 @@ function MyBookingsPage() {
           </p>
         </div>
 
-        {bookings.length === 0 ? (
+        {errorMessage && <div className="message-error">{errorMessage}</div>}
+
+        {loading ? (
+          <div className="card empty-state">
+            <h3>Loading bookings...</h3>
+            <p>Fetching your latest tickets.</p>
+          </div>
+        ) : bookings.length === 0 ? (
           <div className="card empty-state">
             <h3>No bookings yet</h3>
             <p>Your booked tickets will appear here.</p>
           </div>
         ) : (
-          bookings.map((booking) => {
+          <div className="bookings-grid">
+            {bookings.map((booking) => {
             const hasValidQr =
               booking.qrImagePath &&
               typeof booking.qrImagePath === "string" &&
               booking.qrImagePath.startsWith("data:image");
 
             return (
-              <div className="card" key={booking.bookingId}>
-                <div className="card-title">Booking #{booking.bookingId}</div>
+              <div className="booking-ticket-card" key={booking.bookingId}>
+                <div className="booking-ticket-head">
+                  <div className="card-title">Booking #{booking.bookingId}</div>
+                  <span className={`badge ${booking.paymentStatus === "SUCCESS" ? "approved" : "pending"}`}>
+                    {booking.paymentStatus || "PENDING"}
+                  </span>
+                </div>
 
                 <div className="info-row">
                   <strong>Quantity:</strong> {booking.quantity}
@@ -55,9 +101,6 @@ function MyBookingsPage() {
                 </div>
                 <div className="info-row">
                   <strong>Payment Mode:</strong> {booking.paymentMode}
-                </div>
-                <div className="info-row">
-                  <strong>Payment Status:</strong> {booking.paymentStatus}
                 </div>
                 <div className="info-row">
                   <strong>Seat Numbers:</strong> {booking.seatNumbers}
@@ -73,8 +116,7 @@ function MyBookingsPage() {
                     <img
                       src={booking.qrImagePath}
                       alt="QR Code"
-                      className="qr-image"
-                      style={{ width: "220px", height: "220px", marginTop: "10px" }}
+                      className="qr-image booking-qr-image"
                     />
                   ) : (
                     <p style={{ marginTop: "10px" }}>QR image not available.</p>
@@ -82,7 +124,8 @@ function MyBookingsPage() {
                 </div>
               </div>
             );
-          })
+          })}
+          </div>
         )}
       </div>
     </>

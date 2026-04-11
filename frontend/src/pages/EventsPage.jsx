@@ -1,13 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   getAllEvents,
   getLiveEvents,
   getNonSeatBasedEvents,
   getUpcomingEvents,
-  getEventsByCategory,
-  getEventsByLocation,
-  getEventsByDate,
   getSeatBasedEvents,
 } from "../services/eventService";
 import Navbar from "../components/Navbar";
@@ -52,11 +49,14 @@ const getThemeClassFromCategory = (category = "") => {
 };
 
 function EventsPage() {
-  const [events, setEvents] = useState([]);
-  const [category, setCategory] = useState("");
-  const [location, setLocation] = useState("");
+  const [allEvents, setAllEvents] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedLocation, setSelectedLocation] = useState("");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
   const [loading, setLoading] = useState(false);
   const [activeView, setActiveView] = useState("ALL");
   const [welcomeMessage, setWelcomeMessage] = useState("");
@@ -66,7 +66,8 @@ function EventsPage() {
     try {
       setLoading(true);
       const data = await getAllEvents();
-      setEvents(toDisplayableUserEvents(data));
+      setAllEvents(toDisplayableUserEvents(data));
+      setActiveView("ALL");
     } catch (error) {
       console.error(error);
       alert("Failed to load events");
@@ -90,50 +91,6 @@ function EventsPage() {
     return () => clearTimeout(timer);
   }, []);
 
-  const handleCategoryFilter = async () => {
-    if (!category) {
-      alert("Please select a category first.");
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const data = await getEventsByCategory(category);
-      setEvents(toDisplayableUserEvents(data));
-    } catch (error) {
-      console.error(error);
-      alert("Category filter failed");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleLocationFilter = async () => {
-    try {
-      setLoading(true);
-      const data = await getEventsByLocation(location);
-      setEvents(toDisplayableUserEvents(data));
-    } catch (error) {
-      console.error(error);
-      alert("Location filter failed");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDateFilter = async () => {
-    try {
-      setLoading(true);
-      const data = await getEventsByDate(start, end);
-      setEvents(toDisplayableUserEvents(data));
-    } catch (error) {
-      console.error(error);
-      alert("Date filter failed");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const loadByView = async (view) => {
     try {
       setLoading(true);
@@ -144,13 +101,80 @@ function EventsPage() {
       if (view === "UPCOMING") data = await getUpcomingEvents();
       if (view === "SEAT_BASED") data = await getSeatBasedEvents();
       if (view === "NON_SEAT_BASED") data = await getNonSeatBasedEvents();
-      setEvents(toDisplayableUserEvents(data));
+      setAllEvents(toDisplayableUserEvents(data));
     } catch (error) {
       console.error(error);
       alert("Failed to load selected event view");
     } finally {
       setLoading(false);
     }
+  };
+
+  const locationOptions = useMemo(() => {
+    const unique = Array.from(
+      new Set(
+        (allEvents || [])
+          .map((event) => (event.location || "").trim())
+          .filter(Boolean)
+      )
+    );
+    return unique.sort((a, b) => a.localeCompare(b));
+  }, [allEvents]);
+
+  const visibleEvents = useMemo(() => {
+    const searchLower = searchTerm.trim().toLowerCase();
+    const min = minPrice === "" ? null : Number(minPrice);
+    const max = maxPrice === "" ? null : Number(maxPrice);
+
+    return (allEvents || []).filter((event) => {
+      const eventCategory = (event.category || "").toUpperCase();
+      const eventLocation = (event.location || "").trim();
+      const eventPrice = Number(event.price || 0);
+      const eventDate = new Date(event.eventDate);
+
+      if (selectedCategory && eventCategory !== selectedCategory) return false;
+      if (selectedLocation && eventLocation !== selectedLocation) return false;
+
+      if (Number.isFinite(min) && eventPrice < min) return false;
+      if (Number.isFinite(max) && eventPrice > max) return false;
+
+      if (searchLower) {
+        const haystack = [
+          event.title,
+          event.description,
+          event.location,
+          event.category,
+          String(event.price),
+        ]
+          .join(" ")
+          .toLowerCase();
+        if (!haystack.includes(searchLower)) return false;
+      }
+
+      if (!Number.isNaN(eventDate.getTime())) {
+        if (start) {
+          const startDate = new Date(`${start}T00:00:00`);
+          if (eventDate.getTime() < startDate.getTime()) return false;
+        }
+
+        if (end) {
+          const endDate = new Date(`${end}T23:59:59`);
+          if (eventDate.getTime() > endDate.getTime()) return false;
+        }
+      }
+
+      return true;
+    });
+  }, [allEvents, selectedCategory, selectedLocation, minPrice, maxPrice, searchTerm, start, end]);
+
+  const clearLocalFilters = () => {
+    setSelectedCategory("");
+    setSelectedLocation("");
+    setSearchTerm("");
+    setMinPrice("");
+    setMaxPrice("");
+    setStart("");
+    setEnd("");
   };
 
   return (
@@ -165,51 +189,107 @@ function EventsPage() {
           </p>
         </div>
 
-        <div className="card">
-          <h3>Filter Events</h3>
+        <div className="search-strip">
+          <input
+            className="search-input"
+            placeholder="Search by event name, location, category, or price..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          <div className="price-range">
+            <input
+              type="number"
+              min="0"
+              placeholder="Min Price"
+              value={minPrice}
+              onChange={(e) => setMinPrice(e.target.value)}
+            />
+            <input
+              type="number"
+              min="0"
+              placeholder="Max Price"
+              value={maxPrice}
+              onChange={(e) => setMaxPrice(e.target.value)}
+            />
+          </div>
+        </div>
 
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "12px" }}>
-            <button className={activeView === "ALL" ? "" : "secondary"} onClick={() => loadByView("ALL")}>All</button>
-            <button className={activeView === "LIVE" ? "" : "secondary"} onClick={() => loadByView("LIVE")}>Live</button>
-            <button className={activeView === "UPCOMING" ? "" : "secondary"} onClick={() => loadByView("UPCOMING")}>Upcoming</button>
-            <button className={activeView === "SEAT_BASED" ? "" : "secondary"} onClick={() => loadByView("SEAT_BASED")}>Seat Based</button>
-            <button className={activeView === "NON_SEAT_BASED" ? "" : "secondary"} onClick={() => loadByView("NON_SEAT_BASED")}>Non-seat</button>
+        <div className="card events-filter-card">
+          <h3>Smart Filters</h3>
+
+          <div className="filter-chip-row">
+            <button className={`filter-chip ${activeView === "ALL" ? "active" : ""}`} onClick={() => loadByView("ALL")}>
+              <span className="chip-icon chip-all" /> All
+            </button>
+            <button className={`filter-chip ${activeView === "LIVE" ? "active" : ""}`} onClick={() => loadByView("LIVE")}>
+              <span className="chip-icon chip-live" /> Live
+            </button>
+            <button className={`filter-chip ${activeView === "UPCOMING" ? "active" : ""}`} onClick={() => loadByView("UPCOMING")}>
+              <span className="chip-icon chip-upcoming" /> Upcoming
+            </button>
+            <button className={`filter-chip ${activeView === "SEAT_BASED" ? "active" : ""}`} onClick={() => loadByView("SEAT_BASED")}>
+              <span className="chip-icon chip-seat" /> Seat Based
+            </button>
+            <button className={`filter-chip ${activeView === "NON_SEAT_BASED" ? "active" : ""}`} onClick={() => loadByView("NON_SEAT_BASED")}>
+              <span className="chip-icon chip-general" /> Non-seat
+            </button>
           </div>
 
-          <div className="grid-2">
+          <div className="grid-2" style={{ marginTop: "8px" }}>
             <div>
               <label className="label">Category</label>
               <select
                 className="select-field"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
               >
-                <option value="">Select Category</option>
+                <option value="">All Categories</option>
                 {CATEGORY_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
                 ))}
               </select>
-              <button onClick={handleCategoryFilter}>Filter by Category</button>
             </div>
 
             <div>
               <label className="label">Location</label>
-              <input
-                placeholder="e.g. Hyderabad"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-              />
-              <button onClick={handleLocationFilter}>Filter by Location</button>
+              <select
+                className="select-field"
+                value={selectedLocation}
+                onChange={(e) => setSelectedLocation(e.target.value)}
+              >
+                <option value="">All Locations</option>
+                {locationOptions.map((locationName) => (
+                  <option key={locationName} value={locationName}>
+                    {locationName}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
-          <div className="grid-2" style={{ marginTop: "10px" }}>
+          <div className="filter-chip-row" style={{ marginTop: "10px" }}>
+            {locationOptions.slice(0, 8).map((locationName) => (
+              <button
+                key={locationName}
+                className={`filter-chip ${selectedLocation === locationName ? "active" : ""}`}
+                onClick={() =>
+                  setSelectedLocation((previous) =>
+                    previous === locationName ? "" : locationName
+                  )
+                }
+              >
+                <span className="chip-icon chip-location" /> {locationName}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid-2" style={{ marginTop: "12px" }}>
             <div>
               <label className="label">Start Date</label>
               <input
-                type="datetime-local"
+                type="date"
                 value={start}
                 onChange={(e) => setStart(e.target.value)}
               />
@@ -218,91 +298,102 @@ function EventsPage() {
             <div>
               <label className="label">End Date</label>
               <input
-                type="datetime-local"
+                type="date"
                 value={end}
                 onChange={(e) => setEnd(e.target.value)}
               />
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-            <button onClick={handleDateFilter}>Filter by Date</button>
+          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginTop: "12px" }}>
+            <button onClick={clearLocalFilters} className="secondary">
+              Clear Local Filters
+            </button>
             <button onClick={loadEvents} className="secondary">
-              Show All Events
+              Reload All Events
             </button>
           </div>
         </div>
 
         <div className="category-showcase">
-          <div className="category-banner category-banner-music">Music Concerts</div>
-          <div className="category-banner category-banner-standup">Stand-up Comedy</div>
-          <div className="category-banner category-banner-night">Night Events</div>
-          <div className="category-banner category-banner-cultural">Cultural Events</div>
+          <button
+            className={`category-banner category-banner-music ${selectedCategory === "MUSIC" ? "active" : ""}`}
+            onClick={() =>
+              setSelectedCategory((previous) => (previous === "MUSIC" ? "" : "MUSIC"))
+            }
+          >
+            Music Concerts
+          </button>
+          <button
+            className={`category-banner category-banner-standup ${selectedCategory === "STANDUP" ? "active" : ""}`}
+            onClick={() =>
+              setSelectedCategory((previous) => (previous === "STANDUP" ? "" : "STANDUP"))
+            }
+          >
+            Stand-up Comedy
+          </button>
+          <button
+            className={`category-banner category-banner-night ${selectedCategory === "NIGHT" ? "active" : ""}`}
+            onClick={() =>
+              setSelectedCategory((previous) => (previous === "NIGHT" ? "" : "NIGHT"))
+            }
+          >
+            Night Events
+          </button>
+          <button
+            className={`category-banner category-banner-cultural ${selectedCategory === "CULTURAL" ? "active" : ""}`}
+            onClick={() =>
+              setSelectedCategory((previous) => (previous === "CULTURAL" ? "" : "CULTURAL"))
+            }
+          >
+            Cultural Events
+          </button>
         </div>
 
-        <div className="grid-2">
+        <div className="events-gallery">
           {loading ? (
             <div className="card">
               <h3>Loading events...</h3>
               <p className="subtext">Please wait while we fetch the latest events.</p>
             </div>
-          ) : events.length > 0 ? (
-            events.map((event) => (
-              <div className="card" key={event.eventId}>
-                {event.wallpaperUrl ? (
-                  <img
-                    src={event.wallpaperUrl}
-                    alt={`${event.title} wallpaper`}
-                    style={{
-                      width: "100%",
-                      height: "180px",
-                      objectFit: "cover",
-                      borderRadius: "12px",
-                      marginBottom: "12px",
-                    }}
-                  />
-                ) : (
-                  <div className={`event-theme ${getThemeClassFromCategory(event.category)}`}>
-                    <div className="event-theme-label">{event.category || "Featured Event"}</div>
-                  </div>
-                )}
-                <div className="card-title">{event.title}</div>
-                <p className="subtext">{event.description}</p>
-
-                <div className="info-row">
-                  <strong>Location:</strong> {event.location}
-                </div>
-                <div className="info-row">
-                  <strong>Category:</strong> {event.category}
-                </div>
-                <div className="info-row">
-                  <strong>Date:</strong> {formatDateTime(event.eventDate)}
-                </div>
-                <div className="info-row">
-                  <strong>Price:</strong> ₹{formatAmount(event.price)}
-                </div>
-                <div className="info-row">
-                  <strong>Seats Available:</strong> {event.availableSeats}
-                </div>
-                <div className="info-row">
-                  <strong>Event Status:</strong> {event.eventStatus || "UPCOMING"}
-                </div>
-                <div className="info-row">
-                  <strong>Seat Selection:</strong> {event.hasSeats ? "Yes" : "No"}
+          ) : visibleEvents.length > 0 ? (
+            visibleEvents.map((event) => (
+              <div className="event-poster-card" key={event.eventId}>
+                <div className="event-poster-media">
+                  {event.wallpaperUrl ? (
+                    <img
+                      src={event.wallpaperUrl}
+                      alt={`${event.title} wallpaper`}
+                      className="event-poster-image"
+                    />
+                  ) : (
+                    <div className={`event-theme ${getThemeClassFromCategory(event.category)}`}>
+                      <div className="event-theme-label">{event.category || "Featured Event"}</div>
+                    </div>
+                  )}
+                  <div className="event-poster-date">{formatDateTime(event.eventDate)}</div>
                 </div>
 
-                <button
-                  style={{ width: "100%", marginTop: "15px" }}
-                  onClick={() => navigate("/book", { state: { event } })}
-                >
-                  Book Now
-                </button>
+                <div className="event-poster-content">
+                  <div className="event-poster-title">{event.title}</div>
+                  <div className="event-poster-location">{event.location}</div>
+                  <div className="event-poster-meta">{event.category}</div>
+                  <div className="event-poster-meta">₹{formatAmount(event.price)} per ticket</div>
+                  <div className="event-poster-meta">Seats: {event.availableSeats}</div>
+
+                  <button
+                    className="event-poster-action"
+                    onClick={() => navigate("/book", { state: { event } })}
+                  >
+                    Book Now
+                  </button>
+                </div>
               </div>
             ))
           ) : (
             <div className="card empty-state">
               <h3>No events found</h3>
-              <p>Try changing filters or check again later.</p>
+              <p>Try changing category, location, date, or search term.</p>
             </div>
           )}
         </div>
