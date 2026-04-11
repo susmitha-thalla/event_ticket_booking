@@ -11,6 +11,17 @@ const LAYOUT_OPTIONS = {
   LARGE: 200,
 };
 
+const CATEGORY_OPTIONS = [
+  "MUSIC",
+  "STANDUP",
+  "NIGHT",
+  "CULTURAL",
+  "TECH",
+  "WORKSHOP",
+  "SPORTS",
+  "OTHER",
+];
+
 const generateSeatCodes = (seatCount) => {
   const perRow = 10;
   const seats = [];
@@ -236,7 +247,20 @@ function CreateEventPage() {
               required
             />
             <input name="location" placeholder="Location" onChange={handleChange} required />
-            <input name="category" placeholder="Category" onChange={handleChange} required />
+            <select
+              className="select-field"
+              name="category"
+              value={form.category}
+              onChange={handleChange}
+              required
+            >
+              <option value="">Select Category</option>
+              {CATEGORY_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
             <input
               type="url"
               name="wallpaperUrl"
@@ -303,6 +327,7 @@ function CreateEventPage() {
             </label>
 
             <select
+              className="select-field"
               name="recurrenceType"
               value={form.recurrenceType}
               onChange={handleChange}
@@ -315,7 +340,11 @@ function CreateEventPage() {
 
             {form.hasSeats ? (
               <>
-                <select value={layoutSize} onChange={(e) => setLayoutSize(e.target.value)}>
+                <select
+                  className="select-field"
+                  value={layoutSize}
+                  onChange={(e) => setLayoutSize(e.target.value)}
+                >
                   <option value="SMALL">Small Layout (50 seats)</option>
                   <option value="MEDIUM">Medium Layout (150 seats)</option>
                   <option value="LARGE">Large Layout (200 seats)</option>

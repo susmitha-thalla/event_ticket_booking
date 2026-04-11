@@ -12,6 +12,16 @@ import {
 } from "../services/eventService";
 import Navbar from "../components/Navbar";
 
+const CATEGORY_OPTIONS = [
+  { value: "MUSIC", label: "Music Concerts" },
+  { value: "STANDUP", label: "Stand-up Comedy" },
+  { value: "NIGHT", label: "Night Events" },
+  { value: "CULTURAL", label: "Cultural Events" },
+  { value: "TECH", label: "Tech" },
+  { value: "WORKSHOP", label: "Workshops" },
+  { value: "SPORTS", label: "Sports" },
+];
+
 const formatDateTime = (value) => {
   if (!value) return "N/A";
   const parsed = new Date(value);
@@ -31,6 +41,15 @@ const isEventCompleted = (event) => {
 };
 const toDisplayableUserEvents = (events) =>
   (events || []).filter((event) => !isEventDeleted(event) && !isEventCompleted(event));
+
+const getThemeClassFromCategory = (category = "") => {
+  const normalized = String(category).toLowerCase();
+  if (normalized.includes("music") || normalized.includes("concert")) return "event-theme-music";
+  if (normalized.includes("stand") || normalized.includes("comedy")) return "event-theme-standup";
+  if (normalized.includes("night") || normalized.includes("party")) return "event-theme-night";
+  if (normalized.includes("culture") || normalized.includes("cultural")) return "event-theme-cultural";
+  return "event-theme-default";
+};
 
 function EventsPage() {
   const [events, setEvents] = useState([]);
@@ -72,6 +91,11 @@ function EventsPage() {
   }, []);
 
   const handleCategoryFilter = async () => {
+    if (!category) {
+      alert("Please select a category first.");
+      return;
+    }
+
     try {
       setLoading(true);
       const data = await getEventsByCategory(category);
@@ -155,11 +179,18 @@ function EventsPage() {
           <div className="grid-2">
             <div>
               <label className="label">Category</label>
-              <input
-                placeholder="e.g. MUSIC"
+              <select
+                className="select-field"
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-              />
+              >
+                <option value="">Select Category</option>
+                {CATEGORY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
               <button onClick={handleCategoryFilter}>Filter by Category</button>
             </div>
 
@@ -202,6 +233,13 @@ function EventsPage() {
           </div>
         </div>
 
+        <div className="category-showcase">
+          <div className="category-banner category-banner-music">Music Concerts</div>
+          <div className="category-banner category-banner-standup">Stand-up Comedy</div>
+          <div className="category-banner category-banner-night">Night Events</div>
+          <div className="category-banner category-banner-cultural">Cultural Events</div>
+        </div>
+
         <div className="grid-2">
           {loading ? (
             <div className="card">
@@ -223,7 +261,11 @@ function EventsPage() {
                       marginBottom: "12px",
                     }}
                   />
-                ) : null}
+                ) : (
+                  <div className={`event-theme ${getThemeClassFromCategory(event.category)}`}>
+                    <div className="event-theme-label">{event.category || "Featured Event"}</div>
+                  </div>
+                )}
                 <div className="card-title">{event.title}</div>
                 <p className="subtext">{event.description}</p>
 

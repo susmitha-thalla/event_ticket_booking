@@ -23,28 +23,6 @@ const getArrayFromPayload = (payload, keys = []) => {
   return [];
 };
 
-const getCountFromPayload = (payload, keys = []) => {
-  if (!payload || typeof payload !== "object") return 0;
-  const toCount = (value) => {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  };
-
-  for (const key of keys) {
-    const count = toCount(payload[key]);
-    if (count !== null) return count;
-  }
-
-  if (payload.data && typeof payload.data === "object") {
-    for (const key of keys) {
-      const count = toCount(payload.data[key]);
-      if (count !== null) return count;
-    }
-  }
-
-  return 0;
-};
-
 function AdminDashboardPage() {
   const [stats, setStats] = useState({
     users: 0,
@@ -88,14 +66,14 @@ function AdminDashboardPage() {
         const cancelledBookings = bookings.filter((booking) => booking.bookingStatus === "CANCELLED").length;
 
         setStats({
-          users: users.length || getCountFromPayload(usersPayload, ["totalUsers", "usersCount", "count", "total"]),
-          events: visibleEvents.length || getCountFromPayload(eventsPayload, ["totalEvents", "eventsCount", "count", "total"]),
-          upcomingEvents: upcomingEvents || getCountFromPayload(eventsPayload, ["upcomingEvents", "upcomingCount"]),
-          completedEvents: completedEvents || getCountFromPayload(eventsPayload, ["completedEvents", "completedCount"]),
-          bookings: bookings.length || getCountFromPayload(bookingsPayload, ["totalBookings", "bookingsCount", "count", "total"]),
-          pendingEvents: pendingEvents || getCountFromPayload(eventsPayload, ["pendingEvents", "pendingCount"]),
-          liveEvents: liveEvents || getCountFromPayload(eventsPayload, ["liveEvents", "liveCount"]),
-          cancelledBookings: cancelledBookings || getCountFromPayload(bookingsPayload, ["cancelledBookings", "cancelledCount"]),
+          users: users.length,
+          events: visibleEvents.length,
+          upcomingEvents,
+          completedEvents,
+          bookings: bookings.length,
+          pendingEvents,
+          liveEvents,
+          cancelledBookings,
         });
       } catch (error) {
         console.error(error);

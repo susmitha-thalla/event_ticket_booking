@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { deleteEvent, getMyEvents } from "../services/eventService";
 
@@ -11,6 +12,7 @@ const formatDateTime = (value) => {
 
 function MyEventsPage() {
   const [events, setEvents] = useState([]);
+  const [searchParams, setSearchParams] = useSearchParams();
   const isEventDeleted = (event) => event?.isDeleted || event?.eventStatus === "DELETED";
   const isEventCompleted = (event) => {
     if (!event) return false;
@@ -24,7 +26,7 @@ function MyEventsPage() {
   const loadEvents = async () => {
     try {
       const data = await getMyEvents();
-      setEvents((data || []).filter((event) => !isEventDeleted(event)));
+      setEvents(data || []);
     } catch (error) {
       console.error(error);
       alert("Failed to load my events");
@@ -39,17 +41,33 @@ function MyEventsPage() {
     try {
       const response = await deleteEvent(eventId);
       alert(response);
-      setEvents((previous) => previous.filter((event) => event.eventId !== eventId));
+      setEvents((previous) =>
+        previous.map((event) =>
+          event.eventId === eventId
+            ? { ...event, isDeleted: true, eventStatus: "DELETED" }
+            : event
+        )
+      );
     } catch (error) {
       console.error(error);
       alert(error.response?.data || "Delete failed");
     }
   };
 
-  const upcomingEvents = events.filter((event) => !isEventCompleted(event));
-  const completedEvents = events.filter((event) => isEventCompleted(event));
+  const upcomingEvents = events.filter(
+    (event) => !isEventDeleted(event) && !isEventCompleted(event)
+  );
+  const completedEvents = events.filter(
+    (event) => !isEventDeleted(event) && isEventCompleted(event)
+  );
+  const deletedEvents = events.filter((event) => isEventDeleted(event));
+  const activeTab = searchParams.get("tab") || "upcoming";
 
-  const renderEventCard = (event) => (
+  const setTab = (tab) => {
+    setSearchParams({ tab });
+  };
+
+  const renderEventCard = (event, options = {}) => (
     <div className="card" key={event.eventId}>
       {event.wallpaperUrl ? (
         <img
@@ -81,11 +99,13 @@ function MyEventsPage() {
         {event.approvalStatus}
       </span>
 
-      <div style={{ marginTop: "10px" }}>
-        <button className="danger" onClick={() => handleDelete(event.eventId)}>
-          Delete Event
-        </button>
-      </div>
+      {!options.isDeletedList && (
+        <div style={{ marginTop: "10px" }}>
+          <button className="danger" onClick={() => handleDelete(event.eventId)}>
+            Delete Event
+          </button>
+        </div>
+      )}
     </div>
   );
 
@@ -95,22 +115,67 @@ function MyEventsPage() {
       <div className="container">
         <h2>My Events</h2>
 
-        <h3>Upcoming Events ({upcomingEvents.length})</h3>
-        {upcomingEvents.length === 0 ? (
-          <div className="card empty-state">
-            <p>No upcoming events.</p>
-          </div>
-        ) : (
-          upcomingEvents.map((event) => renderEventCard(event))
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "16px" }}>
+          <button
+            type="button"
+            className={activeTab === "upcoming" ? "" : "secondary"}
+            onClick={() => setTab("upcoming")}
+          >
+            Upcoming ({upcomingEvents.length})
+          </button>
+          <button
+            type="button"
+            className={activeTab === "completed" ? "" : "secondary"}
+            onClick={() => setTab("completed")}
+          >
+            Completed ({completedEvents.length})
+          </button>
+          <button
+            type="button"
+            className={activeTab === "deleted" ? "danger" : "secondary"}
+            onClick={() => setTab("deleted")}
+          >
+            Deleted ({deletedEvents.length})
+          </button>
+        </div>
+
+        {activeTab === "upcoming" && (
+          <>
+            <h3>Upcoming Events ({upcomingEvents.length})</h3>
+            {upcomingEvents.length === 0 ? (
+              <div className="card empty-state">
+                <p>No upcoming events.</p>
+              </div>
+            ) : (
+              upcomingEvents.map((event) => renderEventCard(event))
+            )}
+          </>
         )}
 
-        <h3 style={{ marginTop: "20px" }}>Completed Events ({completedEvents.length})</h3>
-        {completedEvents.length === 0 ? (
-          <div className="card empty-state">
-            <p>No completed events.</p>
-          </div>
-        ) : (
-          completedEvents.map((event) => renderEventCard(event))
+        {activeTab === "completed" && (
+          <>
+            <h3>Completed Events ({completedEvents.length})</h3>
+            {completedEvents.length === 0 ? (
+              <div className="card empty-state">
+                <p>No completed events.</p>
+              </div>
+            ) : (
+              completedEvents.map((event) => renderEventCard(event))
+            )}
+          </>
+        )}
+
+        {activeTab === "deleted" && (
+          <>
+            <h3>Deleted Events ({deletedEvents.length})</h3>
+            {deletedEvents.length === 0 ? (
+              <div className="card empty-state">
+                <p>No deleted events.</p>
+              </div>
+            ) : (
+              deletedEvents.map((event) => renderEventCard(event, { isDeletedList: true }))
+            )}
+          </>
         )}
       </div>
     </>

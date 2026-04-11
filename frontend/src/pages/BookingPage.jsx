@@ -119,33 +119,15 @@ function BookingPage() {
         };
 
         if (requiresSeatSelection) {
-          if (selectedSeats.length === 1) {
-            const singleSeatBooking = await bookTicket({
-              ...basePayload,
-              seatNumbers: [selectedSeats[0]],
-              quantity: 1,
-            });
-
-            setProcessingPayment(false);
-            setShowPaymentModal(false);
-            navigate("/booking-success", { state: { booking: singleSeatBooking } });
-            return;
-          }
-
-          const bookingResponses = [];
-          for (const seatCode of selectedSeats) {
-            const bookingResponse = await bookTicket({
-              ...basePayload,
-              seatNumbers: [seatCode],
-              quantity: 1,
-            });
-            bookingResponses.push(bookingResponse);
-          }
+          const groupedSeatBooking = await bookTicket({
+            ...basePayload,
+            seatNumbers: selectedSeats,
+            quantity: selectedSeats.length,
+          });
 
           setProcessingPayment(false);
           setShowPaymentModal(false);
-          alert(`Booked ${bookingResponses.length} tickets successfully.`);
-          navigate("/my-bookings");
+          navigate("/booking-success", { state: { booking: groupedSeatBooking } });
           return;
         } else {
           const response = await bookTicket({
@@ -254,6 +236,7 @@ function BookingPage() {
             )}
 
             <select
+              className="select-field"
               name="gender"
               placeholder="Gender"
               value={form.gender}
@@ -268,6 +251,7 @@ function BookingPage() {
           
 
             <select
+              className="select-field"
               name="paymentMode"
               value={form.paymentMode}
               onChange={handleChange}

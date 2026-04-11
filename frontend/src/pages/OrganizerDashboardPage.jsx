@@ -50,6 +50,22 @@ function OrganizerDashboardPage() {
               <Link to="/organizer/bookings">Open</Link>
             </div>
           </div>
+
+          <div className="stat-box">
+            <div className="stat-value">Completed</div>
+            <div className="stat-label">Open completed events list</div>
+            <div style={{ marginTop: "14px" }}>
+              <Link to="/organizer/my-events?tab=completed">Open</Link>
+            </div>
+          </div>
+
+          <div className="stat-box">
+            <div className="stat-value">Deleted</div>
+            <div className="stat-label">View deleted events separately</div>
+            <div style={{ marginTop: "14px" }}>
+              <Link to="/organizer/my-events?tab=deleted">Open</Link>
+            </div>
+          </div>
         </div>
       </div>
     </>

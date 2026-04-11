@@ -52,7 +52,7 @@ function AllEventsPage() {
     try {
       const response = await deleteEvent(eventId);
       alert(response);
-      setEvents((previous) => previous.filter((event) => event.eventId !== eventId));
+      await loadEvents();
     } catch (error) {
       console.error(error);
       alert(error.response?.data || "Delete failed");
