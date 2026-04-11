@@ -3,24 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { getMyBookings } from "../services/bookingService";
 import Navbar from "../components/Navbar";
 
-const getArrayFromPayload = (payload, keys = []) => {
-  if (Array.isArray(payload)) return payload;
-  if (!payload || typeof payload !== "object") return [];
-
-  for (const key of keys) {
-    if (Array.isArray(payload[key])) return payload[key];
-  }
-
-  if (Array.isArray(payload.data)) return payload.data;
-  if (payload.data && typeof payload.data === "object") {
-    for (const key of keys) {
-      if (Array.isArray(payload.data[key])) return payload.data[key];
-    }
-  }
-
-  return [];
-};
-
 function MyBookingsPage() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -33,8 +15,7 @@ function MyBookingsPage() {
         setLoading(true);
         setErrorMessage("");
         const data = await getMyBookings();
-        const bookingList = getArrayFromPayload(data, ["bookings", "content", "items", "results"]);
-        setBookings(bookingList);
+        setBookings(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error(error);
         const status = error?.response?.status;
@@ -85,28 +66,31 @@ function MyBookingsPage() {
               booking.qrImagePath.startsWith("data:image");
 
             return (
-              <div className="booking-ticket-card" key={booking.bookingId}>
+              <div className="booking-ticket-card" key={booking.bookingId || booking.id}>
                 <div className="booking-ticket-head">
-                  <div className="card-title">Booking #{booking.bookingId}</div>
+                  <div className="card-title">Booking #{booking.bookingId || booking.id || "N/A"}</div>
                   <span className={`badge ${booking.paymentStatus === "SUCCESS" ? "approved" : "pending"}`}>
-                    {booking.paymentStatus || "PENDING"}
+                    {booking.paymentStatus || booking.status || "PENDING"}
                   </span>
                 </div>
 
                 <div className="info-row">
-                  <strong>Quantity:</strong> {booking.quantity}
+                  <strong>Quantity:</strong> {booking.quantity || 0}
                 </div>
                 <div className="info-row">
-                  <strong>Total Amount:</strong> ₹{booking.totalAmount}
+                  <strong>Total Amount:</strong> ₹{booking.totalAmount || 0}
                 </div>
                 <div className="info-row">
-                  <strong>Payment Mode:</strong> {booking.paymentMode}
+                  <strong>Payment Mode:</strong> {booking.paymentMode || "N/A"}
                 </div>
                 <div className="info-row">
-                  <strong>Seat Numbers:</strong> {booking.seatNumbers}
+                  <strong>Booking Status:</strong> {booking.bookingStatus || "CONFIRMED"}
                 </div>
                 <div className="info-row">
-                  <strong>Gender:</strong> {booking.gender}
+                  <strong>Seat Numbers:</strong> {booking.seatNumbers || "N/A"}
+                </div>
+                <div className="info-row">
+                  <strong>Gender:</strong> {booking.gender || "N/A"}
                 </div>
 
                 <div className="qr-box">

@@ -12,24 +12,6 @@ const formatDateTime = (value) => {
 
 const formatAmount = (value) => Number(value || 0).toFixed(2);
 
-const getArrayFromPayload = (payload, keys = []) => {
-  if (Array.isArray(payload)) return payload;
-  if (!payload || typeof payload !== "object") return [];
-
-  for (const key of keys) {
-    if (Array.isArray(payload[key])) return payload[key];
-  }
-
-  if (Array.isArray(payload.data)) return payload.data;
-  if (payload.data && typeof payload.data === "object") {
-    for (const key of keys) {
-      if (Array.isArray(payload.data[key])) return payload.data[key];
-    }
-  }
-
-  return [];
-};
-
 function AllBookingsPage() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -42,8 +24,7 @@ function AllBookingsPage() {
         setLoading(true);
         setErrorMessage("");
         const data = await getAllBookings();
-        const bookingList = getArrayFromPayload(data, ["bookings", "content", "items", "results"]);
-        setBookings(bookingList);
+        setBookings(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error(error);
         const status = error?.response?.status;
@@ -82,20 +63,20 @@ function AllBookingsPage() {
           </div>
         ) : (
           bookings.map((booking) => (
-            <div className="card" key={booking.bookingId}>
-              <p><strong>Booking ID:</strong> {booking.bookingId}</p>
+            <div className="card" key={booking.bookingId || booking.id}>
+              <p><strong>Booking ID:</strong> {booking.bookingId || booking.id || "N/A"}</p>
               <p><strong>Booking Code:</strong> {booking.bookingCode || "N/A"}</p>
               <p><strong>Transaction Code:</strong> {booking.transactionCode || "N/A"}</p>
-              <p><strong>User Email:</strong> {booking.user?.email}</p>
-              <p><strong>Event Title:</strong> {booking.event?.title}</p>
-              <p><strong>Quantity:</strong> {booking.quantity}</p>
+              <p><strong>User Email:</strong> {booking.user?.email || booking.userEmail || booking.email || "N/A"}</p>
+              <p><strong>Event Title:</strong> {booking.event?.title || booking.eventTitle || booking.title || "N/A"}</p>
+              <p><strong>Quantity:</strong> {booking.quantity || 0}</p>
               <p><strong>Total Amount:</strong> ₹{formatAmount(booking.totalAmount)}</p>
-              <p><strong>Payment Mode:</strong> {booking.paymentMode}</p>
-              <p><strong>Payment Status:</strong> {booking.paymentStatus}</p>
+              <p><strong>Payment Mode:</strong> {booking.paymentMode || "N/A"}</p>
+              <p><strong>Payment Status:</strong> {booking.paymentStatus || booking.status || "PENDING"}</p>
               <p><strong>Booking Status:</strong> {booking.bookingStatus || "CONFIRMED"}</p>
               <p><strong>Seats:</strong> {booking.seatNumbers || "N/A"}</p>
-              <p><strong>Gender:</strong> {booking.gender}</p>
-              <p><strong>Booking Time:</strong> {formatDateTime(booking.bookingTime)}</p>
+              <p><strong>Gender:</strong> {booking.gender || "N/A"}</p>
+              <p><strong>Booking Time:</strong> {formatDateTime(booking.bookingTime || booking.createdAt)}</p>
               <p><strong>Confirmed At:</strong> {formatDateTime(booking.confirmedAt)}</p>
               <p><strong>Cancelled At:</strong> {formatDateTime(booking.cancelledAt)}</p>
             </div>
