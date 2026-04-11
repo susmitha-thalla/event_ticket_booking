@@ -34,7 +34,7 @@ function AllBookingsPage() {
           return;
         }
 
-        setErrorMessage("Failed to load all bookings.");
+        setErrorMessage("");
       } finally {
         setLoading(false);
       }

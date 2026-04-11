@@ -99,6 +99,60 @@ const parseBookingList = (payload) => {
   return list.map(normalizeBooking);
 };
 
+const dedupeBookings = (bookings = []) => {
+  const uniqueMap = new Map();
+  for (const booking of bookings) {
+    const id = booking?.bookingId ?? booking?.id;
+    if (id === null || id === undefined) continue;
+    if (!uniqueMap.has(id)) uniqueMap.set(id, booking);
+  }
+  return Array.from(uniqueMap.values());
+};
+
+const shouldTryPerEventFallback = (error) => {
+  const status = error?.response?.status;
+  if (!status) return true;
+  return status >= 500 || status === 408 || status === 413 || status === 429;
+};
+
+const getAllBookingsViaEvents = async () => {
+  const headers = {
+    ...getAuthHeader(),
+  };
+
+  const eventsPayload = await requestFirstSuccessfulGet(["/events/admin/all", "/events/all"]);
+  const events = extractArrayFromPayload(eventsPayload, ["events", "content", "items", "results"]);
+  const eventIds = [...new Set((events || []).map((event) => event?.eventId).filter(Boolean))];
+
+  if (eventIds.length === 0) {
+    return [];
+  }
+
+  const mergedBookings = [];
+  let successfulEventRequests = 0;
+
+  for (const eventId of eventIds) {
+    try {
+      const response = await api.get(`/bookings/event/${eventId}`, {
+        headers,
+      });
+      successfulEventRequests += 1;
+      mergedBookings.push(...parseBookingList(response.data));
+    } catch (error) {
+      const status = error?.response?.status;
+      if (status === 404 || status === 400) {
+        continue;
+      }
+    }
+  }
+
+  if (successfulEventRequests === 0) {
+    throw new Error("Unable to load bookings by event fallback");
+  }
+
+  return dedupeBookings(mergedBookings);
+};
+
 export const bookTicket = async (data) => {
   try {
     const response = await api.post("/bookings/book", data, {
@@ -141,13 +195,21 @@ export const getOrganizerBookings = async () => {
 };
 
 export const getAllBookings = async () => {
-  const payload = await requestFirstSuccessfulGet([
-    "/bookings/all",
-    "/bookings/admin/all",
-    "/admin/bookings/all",
-    "/bookings",
-  ]);
-  return parseBookingList(payload);
+  try {
+    const payload = await requestFirstSuccessfulGet([
+      "/bookings/all",
+      "/bookings/admin/all",
+      "/admin/bookings/all",
+      "/bookings",
+    ]);
+    return parseBookingList(payload);
+  } catch (error) {
+    if (!shouldTryPerEventFallback(error)) {
+      throw error;
+    }
+
+    return getAllBookingsViaEvents();
+  }
 };
 
 export const getBookingsByEventId = async (eventId) => {

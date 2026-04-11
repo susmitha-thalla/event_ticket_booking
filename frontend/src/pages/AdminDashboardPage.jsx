@@ -134,9 +134,11 @@ function AdminDashboardPage() {
       if (usersResult.status === "rejected") failedSegments.push("users");
       if (eventsResult.status === "rejected") failedSegments.push("events");
       if (bookingsResult.status === "rejected") failedSegments.push("bookings");
+      const hasOnlyBookingsFailure =
+        failedSegments.length === 1 && failedSegments[0] === "bookings";
 
       setErrorMessage(
-        failedSegments.length > 0
+        failedSegments.length > 0 && !hasOnlyBookingsFailure
           ? `Some dashboard data could not be refreshed (${failedSegments.join(", ")}). Showing available values.`
           : ""
       );
