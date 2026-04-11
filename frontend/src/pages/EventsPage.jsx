@@ -8,16 +8,8 @@ import {
   getSeatBasedEvents,
 } from "../services/eventService";
 import Navbar from "../components/Navbar";
-
-const CATEGORY_OPTIONS = [
-  { value: "MUSIC", label: "Music Concerts" },
-  { value: "STANDUP", label: "Stand-up Comedy" },
-  { value: "NIGHT", label: "Night Events" },
-  { value: "CULTURAL", label: "Cultural Events" },
-  { value: "TECH", label: "Tech" },
-  { value: "WORKSHOP", label: "Workshops" },
-  { value: "SPORTS", label: "Sports" },
-];
+import { INDIAN_LOCATION_INDEX } from "../data/indianLocations";
+import { searchIndianLocations } from "../services/locationService";
 
 const formatDateTime = (value) => {
   if (!value) return "N/A";
@@ -51,15 +43,17 @@ const getThemeClassFromCategory = (category = "") => {
 function EventsPage() {
   const [allEvents, setAllEvents] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("");
-  const [selectedLocation, setSelectedLocation] = useState("");
+  const [locationInput, setLocationInput] = useState("");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
   const [loading, setLoading] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(false);
   const [activeView, setActiveView] = useState("ALL");
   const [welcomeMessage, setWelcomeMessage] = useState("");
+  const [locationSuggestions, setLocationSuggestions] = useState([]);
   const navigate = useNavigate();
 
   const loadEvents = async () => {
@@ -111,15 +105,41 @@ function EventsPage() {
   };
 
   const locationOptions = useMemo(() => {
-    const unique = Array.from(
-      new Set(
-        (allEvents || [])
-          .map((event) => (event.location || "").trim())
-          .filter(Boolean)
-      )
-    );
-    return unique.sort((a, b) => a.localeCompare(b));
+    const eventLocations = (allEvents || [])
+      .map((event) => (event.location || "").trim())
+      .filter(Boolean)
+      .map((name) => ({
+        label: `${name} - Event Venue`,
+        city: name,
+      }));
+
+    const merged = [...INDIAN_LOCATION_INDEX, ...eventLocations];
+    const uniqueMap = new Map();
+    for (const item of merged) {
+      if (!uniqueMap.has(item.label)) uniqueMap.set(item.label, item);
+    }
+    return Array.from(uniqueMap.values());
   }, [allEvents]);
+
+  useEffect(() => {
+    let active = true;
+    const timer = window.setTimeout(async () => {
+      try {
+        setLocationLoading(true);
+        const suggestions = await searchIndianLocations(locationInput, locationOptions, 30);
+        if (active) {
+          setLocationSuggestions(suggestions);
+        }
+      } finally {
+        if (active) setLocationLoading(false);
+      }
+    }, 220);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [locationInput, locationOptions]);
 
   const visibleEvents = useMemo(() => {
     const searchLower = searchTerm.trim().toLowerCase();
@@ -128,12 +148,13 @@ function EventsPage() {
 
     return (allEvents || []).filter((event) => {
       const eventCategory = (event.category || "").toUpperCase();
-      const eventLocation = (event.location || "").trim();
+      const eventLocation = (event.location || "").trim().toLowerCase();
+      const locationQuery = locationInput.trim().toLowerCase();
       const eventPrice = Number(event.price || 0);
       const eventDate = new Date(event.eventDate);
 
       if (selectedCategory && eventCategory !== selectedCategory) return false;
-      if (selectedLocation && eventLocation !== selectedLocation) return false;
+      if (locationQuery && !eventLocation.includes(locationQuery)) return false;
 
       if (Number.isFinite(min) && eventPrice < min) return false;
       if (Number.isFinite(max) && eventPrice > max) return false;
@@ -165,11 +186,11 @@ function EventsPage() {
 
       return true;
     });
-  }, [allEvents, selectedCategory, selectedLocation, minPrice, maxPrice, searchTerm, start, end]);
+  }, [allEvents, selectedCategory, locationInput, minPrice, maxPrice, searchTerm, start, end]);
 
   const clearLocalFilters = () => {
     setSelectedCategory("");
-    setSelectedLocation("");
+    setLocationInput("");
     setSearchTerm("");
     setMinPrice("");
     setMaxPrice("");
@@ -214,110 +235,29 @@ function EventsPage() {
           </div>
         </div>
 
-        <div className="card events-filter-card">
-          <h3>Smart Filters</h3>
-
-          <div className="filter-chip-row">
-            <button className={`filter-chip ${activeView === "ALL" ? "active" : ""}`} onClick={() => loadByView("ALL")}>
-              <span className="chip-icon chip-all" /> All
-            </button>
-            <button className={`filter-chip ${activeView === "LIVE" ? "active" : ""}`} onClick={() => loadByView("LIVE")}>
-              <span className="chip-icon chip-live" /> Live
-            </button>
-            <button className={`filter-chip ${activeView === "UPCOMING" ? "active" : ""}`} onClick={() => loadByView("UPCOMING")}>
-              <span className="chip-icon chip-upcoming" /> Upcoming
-            </button>
-            <button className={`filter-chip ${activeView === "SEAT_BASED" ? "active" : ""}`} onClick={() => loadByView("SEAT_BASED")}>
-              <span className="chip-icon chip-seat" /> Seat Based
-            </button>
-            <button className={`filter-chip ${activeView === "NON_SEAT_BASED" ? "active" : ""}`} onClick={() => loadByView("NON_SEAT_BASED")}>
-              <span className="chip-icon chip-general" /> Non-seat
-            </button>
-          </div>
-
-          <div className="grid-2" style={{ marginTop: "8px" }}>
-            <div>
-              <label className="label">Category</label>
-              <select
-                className="select-field"
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-              >
-                <option value="">All Categories</option>
-                {CATEGORY_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="label">Location</label>
-              <select
-                className="select-field"
-                value={selectedLocation}
-                onChange={(e) => setSelectedLocation(e.target.value)}
-              >
-                <option value="">All Locations</option>
-                {locationOptions.map((locationName) => (
-                  <option key={locationName} value={locationName}>
-                    {locationName}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="filter-chip-row" style={{ marginTop: "10px" }}>
-            {locationOptions.slice(0, 8).map((locationName) => (
-              <button
-                key={locationName}
-                className={`filter-chip ${selectedLocation === locationName ? "active" : ""}`}
-                onClick={() =>
-                  setSelectedLocation((previous) =>
-                    previous === locationName ? "" : locationName
-                  )
-                }
-              >
-                <span className="chip-icon chip-location" /> {locationName}
-              </button>
-            ))}
-          </div>
-
-          <div className="grid-2" style={{ marginTop: "12px" }}>
-            <div>
-              <label className="label">Start Date</label>
-              <input
-                type="date"
-                value={start}
-                onChange={(e) => setStart(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <label className="label">End Date</label>
-              <input
-                type="date"
-                value={end}
-                onChange={(e) => setEnd(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginTop: "12px" }}>
-            <button onClick={clearLocalFilters} className="secondary">
-              Clear Local Filters
-            </button>
-            <button onClick={loadEvents} className="secondary">
-              Reload All Events
-            </button>
-          </div>
+        <h3 style={{ marginBottom: "10px" }}>Event Types</h3>
+        <div className="filter-chip-row">
+          <button className={`filter-chip ${activeView === "ALL" ? "active" : ""}`} onClick={() => loadByView("ALL")}>
+            All Events
+          </button>
+          <button className={`filter-chip ${activeView === "LIVE" ? "active" : ""}`} onClick={() => loadByView("LIVE")}>
+            Live
+          </button>
+          <button className={`filter-chip ${activeView === "UPCOMING" ? "active" : ""}`} onClick={() => loadByView("UPCOMING")}>
+            Upcoming
+          </button>
+          <button className={`filter-chip ${activeView === "SEAT_BASED" ? "active" : ""}`} onClick={() => loadByView("SEAT_BASED")}>
+            Seat Based
+          </button>
+          <button className={`filter-chip ${activeView === "NON_SEAT_BASED" ? "active" : ""}`} onClick={() => loadByView("NON_SEAT_BASED")}>
+            Non-seat
+          </button>
         </div>
 
-        <div className="category-showcase">
+        <h3 style={{ marginTop: "14px", marginBottom: "8px" }}>Categories</h3>
+        <div className="filter-chip-row">
           <button
-            className={`category-banner category-banner-music ${selectedCategory === "MUSIC" ? "active" : ""}`}
+            className={`filter-chip ${selectedCategory === "MUSIC" ? "active" : ""}`}
             onClick={() =>
               setSelectedCategory((previous) => (previous === "MUSIC" ? "" : "MUSIC"))
             }
@@ -325,7 +265,7 @@ function EventsPage() {
             Music Concerts
           </button>
           <button
-            className={`category-banner category-banner-standup ${selectedCategory === "STANDUP" ? "active" : ""}`}
+            className={`filter-chip ${selectedCategory === "STANDUP" ? "active" : ""}`}
             onClick={() =>
               setSelectedCategory((previous) => (previous === "STANDUP" ? "" : "STANDUP"))
             }
@@ -333,7 +273,7 @@ function EventsPage() {
             Stand-up Comedy
           </button>
           <button
-            className={`category-banner category-banner-night ${selectedCategory === "NIGHT" ? "active" : ""}`}
+            className={`filter-chip ${selectedCategory === "NIGHT" ? "active" : ""}`}
             onClick={() =>
               setSelectedCategory((previous) => (previous === "NIGHT" ? "" : "NIGHT"))
             }
@@ -341,12 +281,60 @@ function EventsPage() {
             Night Events
           </button>
           <button
-            className={`category-banner category-banner-cultural ${selectedCategory === "CULTURAL" ? "active" : ""}`}
+            className={`filter-chip ${selectedCategory === "CULTURAL" ? "active" : ""}`}
             onClick={() =>
               setSelectedCategory((previous) => (previous === "CULTURAL" ? "" : "CULTURAL"))
             }
           >
             Cultural Events
+          </button>
+        </div>
+
+        <div className="grid-2" style={{ marginTop: "12px" }}>
+          <div>
+            <label className="label">Location (City / Pincode / District / Mandal)</label>
+            <input
+              type="text"
+              list="india-location-suggestions"
+              placeholder="Type first letter (e.g. H, B, 5...)"
+              value={locationInput}
+              onChange={(e) => setLocationInput(e.target.value)}
+            />
+            <datalist id="india-location-suggestions">
+              {locationSuggestions.map((item) => (
+                <option key={item.label} value={item.city}>
+                  {item.label}
+                </option>
+              ))}
+            </datalist>
+            <div className="subtext" style={{ marginTop: "6px", marginBottom: 0 }}>
+              {locationLoading ? "Searching locations..." : `${locationSuggestions.length} suggestions`}
+            </div>
+          </div>
+
+          <div>
+            <label className="label">Date Range</label>
+            <div className="date-row">
+              <input
+                type="date"
+                value={start}
+                onChange={(e) => setStart(e.target.value)}
+              />
+              <input
+                type="date"
+                value={end}
+                onChange={(e) => setEnd(e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginTop: "12px" }}>
+          <button onClick={clearLocalFilters} className="secondary">
+            Clear Filters
+          </button>
+          <button onClick={loadEvents} className="secondary">
+            Reload All Events
           </button>
         </div>
 

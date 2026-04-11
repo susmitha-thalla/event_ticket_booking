@@ -35,8 +35,32 @@ export const getOrganizerBookings = async () => {
 };
 
 export const getAllBookings = async () => {
-  const response = await api.get("/bookings/all");
-  return response.data;
+  const endpointCandidates = [
+    "/bookings/all",
+    "/bookings/admin/all",
+    "/admin/bookings/all",
+  ];
+
+  let lastError = null;
+  for (const endpoint of endpointCandidates) {
+    try {
+      const response = await api.get(endpoint);
+      return response.data;
+    } catch (error) {
+      const status = error?.response?.status;
+
+      // Try next endpoint when route is missing.
+      if (status === 404) {
+        lastError = error;
+        continue;
+      }
+
+      // For auth/server errors, stop early and bubble up.
+      throw error;
+    }
+  }
+
+  throw lastError || new Error("Unable to fetch all bookings");
 };
 
 export const getBookingsByEventId = async (eventId) => {
