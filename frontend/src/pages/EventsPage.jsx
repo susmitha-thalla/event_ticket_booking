@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  getCompletedEvents,
   getAllEvents,
   getLiveEvents,
   getNonSeatBasedEvents,
@@ -21,6 +20,17 @@ const formatDateTime = (value) => {
 };
 
 const formatAmount = (value) => Number(value || 0).toFixed(2);
+const isEventDeleted = (event) => event?.isDeleted || event?.eventStatus === "DELETED";
+const isEventCompleted = (event) => {
+  if (!event) return false;
+  if (event.eventStatus === "COMPLETED") return true;
+  if (!event.eventDate) return false;
+  const eventDate = new Date(event.eventDate);
+  if (Number.isNaN(eventDate.getTime())) return false;
+  return eventDate.getTime() < Date.now();
+};
+const toDisplayableUserEvents = (events) =>
+  (events || []).filter((event) => !isEventDeleted(event) && !isEventCompleted(event));
 
 function EventsPage() {
   const [events, setEvents] = useState([]);
@@ -37,7 +47,7 @@ function EventsPage() {
     try {
       setLoading(true);
       const data = await getAllEvents();
-      setEvents(data);
+      setEvents(toDisplayableUserEvents(data));
     } catch (error) {
       console.error(error);
       alert("Failed to load events");
@@ -65,7 +75,7 @@ function EventsPage() {
     try {
       setLoading(true);
       const data = await getEventsByCategory(category);
-      setEvents(data);
+      setEvents(toDisplayableUserEvents(data));
     } catch (error) {
       console.error(error);
       alert("Category filter failed");
@@ -78,7 +88,7 @@ function EventsPage() {
     try {
       setLoading(true);
       const data = await getEventsByLocation(location);
-      setEvents(data);
+      setEvents(toDisplayableUserEvents(data));
     } catch (error) {
       console.error(error);
       alert("Location filter failed");
@@ -91,7 +101,7 @@ function EventsPage() {
     try {
       setLoading(true);
       const data = await getEventsByDate(start, end);
-      setEvents(data);
+      setEvents(toDisplayableUserEvents(data));
     } catch (error) {
       console.error(error);
       alert("Date filter failed");
@@ -108,10 +118,9 @@ function EventsPage() {
       if (view === "ALL") data = await getAllEvents();
       if (view === "LIVE") data = await getLiveEvents();
       if (view === "UPCOMING") data = await getUpcomingEvents();
-      if (view === "COMPLETED") data = await getCompletedEvents();
       if (view === "SEAT_BASED") data = await getSeatBasedEvents();
       if (view === "NON_SEAT_BASED") data = await getNonSeatBasedEvents();
-      setEvents(data);
+      setEvents(toDisplayableUserEvents(data));
     } catch (error) {
       console.error(error);
       alert("Failed to load selected event view");
@@ -139,7 +148,6 @@ function EventsPage() {
             <button className={activeView === "ALL" ? "" : "secondary"} onClick={() => loadByView("ALL")}>All</button>
             <button className={activeView === "LIVE" ? "" : "secondary"} onClick={() => loadByView("LIVE")}>Live</button>
             <button className={activeView === "UPCOMING" ? "" : "secondary"} onClick={() => loadByView("UPCOMING")}>Upcoming</button>
-            <button className={activeView === "COMPLETED" ? "" : "secondary"} onClick={() => loadByView("COMPLETED")}>Completed</button>
             <button className={activeView === "SEAT_BASED" ? "" : "secondary"} onClick={() => loadByView("SEAT_BASED")}>Seat Based</button>
             <button className={activeView === "NON_SEAT_BASED" ? "" : "secondary"} onClick={() => loadByView("NON_SEAT_BASED")}>Non-seat</button>
           </div>

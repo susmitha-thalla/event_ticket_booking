@@ -24,7 +24,7 @@ function BookingPage() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [processingPayment, setProcessingPayment] = useState(false);
   const [selectedApp, setSelectedApp] = useState("");
-  const [selectedSeat, setSelectedSeat] = useState("");
+  const [selectedSeats, setSelectedSeats] = useState([]);
   const [seatMap, setSeatMap] = useState([]);
 
   if (!event) {
@@ -69,6 +69,15 @@ function BookingPage() {
     return Object.entries(groups).sort((a, b) => a[0].localeCompare(b[0]));
   }, [seatMap]);
 
+  const toggleSeatSelection = (seatCode) => {
+    setSelectedSeats((previous) => {
+      if (previous.includes(seatCode)) {
+        return previous.filter((code) => code !== seatCode);
+      }
+      return [...previous, seatCode];
+    });
+  };
+
   const openPaymentModal = (e) => {
     e.preventDefault();
 
@@ -84,8 +93,8 @@ function BookingPage() {
       return;
     }
 
-    if (requiresSeatSelection && !selectedSeat) {
-      alert("Please select one seat for this event.");
+    if (requiresSeatSelection && selectedSeats.length === 0) {
+      alert("Please select at least one seat for this event.");
       return;
     }
 
@@ -110,7 +119,8 @@ function BookingPage() {
         };
 
         if (requiresSeatSelection) {
-          payload.seatNumbers = [selectedSeat];
+          payload.seatNumbers = selectedSeats;
+          payload.quantity = selectedSeats.length;
         } else {
           payload.quantity = Number(form.quantity);
         }
@@ -165,7 +175,7 @@ function BookingPage() {
           <p><strong>{event.title}</strong></p>
           <p className="subtext">{event.location} • {event.category}</p>
           <p><strong>Price per ticket:</strong> ₹{formatAmount(event.price)}</p>
-          <p><strong>Seat Selection:</strong> {requiresSeatSelection ? "Required (1 seat per user)" : "Not Required"}</p>
+          <p><strong>Seat Selection:</strong> {requiresSeatSelection ? "Required (multiple seats allowed)" : "Not Required"}</p>
 
           <form onSubmit={openPaymentModal}>
             {!requiresSeatSelection && (
@@ -183,7 +193,7 @@ function BookingPage() {
             {requiresSeatSelection && (
               <div>
                 <div className="subtext" style={{ marginBottom: "8px" }}>
-                  Tap one available seat from the layout:
+                  Tap one or more available seats from the layout:
                 </div>
                 <div style={{ display: "grid", gap: "8px" }}>
                   {groupedSeats.map(([row, seats]) => (
@@ -191,7 +201,7 @@ function BookingPage() {
                       <strong style={{ minWidth: "28px" }}>{row}</strong>
                       {seats.map((seat) => {
                         const isAvailable = seat.seatStatus === "AVAILABLE";
-                        const isSelected = selectedSeat === seat.seatCode;
+                        const isSelected = selectedSeats.includes(seat.seatCode);
                         return (
                           <button
                             key={seat.seatCode}
@@ -203,7 +213,7 @@ function BookingPage() {
                               opacity: isAvailable ? 1 : 0.45,
                               border: isSelected ? "2px solid #22c55e" : undefined,
                             }}
-                            onClick={() => setSelectedSeat(seat.seatCode)}
+                            onClick={() => toggleSeatSelection(seat.seatCode)}
                           >
                             {seat.seatCode}
                           </button>
@@ -213,7 +223,7 @@ function BookingPage() {
                   ))}
                 </div>
                 <div className="subtext" style={{ marginTop: "8px" }}>
-                  Selected Seat: {selectedSeat || "None"}
+                  Selected Seats: {selectedSeats.length > 0 ? selectedSeats.join(", ") : "None"}
                 </div>
               </div>
             )}
@@ -269,7 +279,7 @@ function BookingPage() {
               <strong>Amount:</strong> ₹{
                 requiresSeatSelection
                   ? formatAmount(
-                      Number(event.price || 0)
+                      Number(selectedSeats.length || 0) * Number(event.price || 0)
                     )
                   : formatAmount(Number(form.quantity || 0) * Number(event.price || 0))
               }

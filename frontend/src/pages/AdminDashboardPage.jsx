@@ -5,10 +5,52 @@ import { getAllUsers } from "../services/adminService";
 import { getAdminAllEvents } from "../services/eventService";
 import { getAllBookings } from "../services/bookingService";
 
+const getArrayFromPayload = (payload, keys = []) => {
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== "object") return [];
+
+  for (const key of keys) {
+    if (Array.isArray(payload[key])) return payload[key];
+  }
+
+  if (Array.isArray(payload.data)) return payload.data;
+  if (payload.data && typeof payload.data === "object") {
+    for (const key of keys) {
+      if (Array.isArray(payload.data[key])) return payload.data[key];
+    }
+  }
+
+  return [];
+};
+
+const getCountFromPayload = (payload, keys = []) => {
+  if (!payload || typeof payload !== "object") return 0;
+  const toCount = (value) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  for (const key of keys) {
+    const count = toCount(payload[key]);
+    if (count !== null) return count;
+  }
+
+  if (payload.data && typeof payload.data === "object") {
+    for (const key of keys) {
+      const count = toCount(payload.data[key]);
+      if (count !== null) return count;
+    }
+  }
+
+  return 0;
+};
+
 function AdminDashboardPage() {
   const [stats, setStats] = useState({
     users: 0,
     events: 0,
+    upcomingEvents: 0,
+    completedEvents: 0,
     bookings: 0,
     pendingEvents: 0,
     liveEvents: 0,
@@ -18,23 +60,42 @@ function AdminDashboardPage() {
   useEffect(() => {
     const loadStats = async () => {
       try {
-        const [users, events, bookings] = await Promise.all([
+        const [usersPayload, eventsPayload, bookingsPayload] = await Promise.all([
           getAllUsers(),
           getAdminAllEvents(),
           getAllBookings(),
         ]);
 
-        const pendingEvents = events.filter((event) => event.approvalStatus !== "APPROVED").length;
-        const liveEvents = events.filter((event) => event.eventStatus === "LIVE").length;
+        const users = getArrayFromPayload(usersPayload, ["users", "content", "items", "results"]);
+        const events = getArrayFromPayload(eventsPayload, ["events", "content", "items", "results"]);
+        const bookings = getArrayFromPayload(bookingsPayload, ["bookings", "content", "items", "results"]);
+
+        const visibleEvents = (events || []).filter(
+          (event) => !event.isDeleted && event.eventStatus !== "DELETED"
+        );
+        const now = Date.now();
+        const isCompleted = (event) => {
+          if (event.eventStatus === "COMPLETED") return true;
+          const eventDate = new Date(event.eventDate);
+          if (Number.isNaN(eventDate.getTime())) return false;
+          return eventDate.getTime() < now;
+        };
+
+        const pendingEvents = visibleEvents.filter((event) => event.approvalStatus !== "APPROVED").length;
+        const liveEvents = visibleEvents.filter((event) => event.eventStatus === "LIVE").length;
+        const completedEvents = visibleEvents.filter((event) => isCompleted(event)).length;
+        const upcomingEvents = visibleEvents.filter((event) => !isCompleted(event)).length;
         const cancelledBookings = bookings.filter((booking) => booking.bookingStatus === "CANCELLED").length;
 
         setStats({
-          users: users.length,
-          events: events.length,
-          bookings: bookings.length,
-          pendingEvents,
-          liveEvents,
-          cancelledBookings,
+          users: users.length || getCountFromPayload(usersPayload, ["totalUsers", "usersCount", "count", "total"]),
+          events: visibleEvents.length || getCountFromPayload(eventsPayload, ["totalEvents", "eventsCount", "count", "total"]),
+          upcomingEvents: upcomingEvents || getCountFromPayload(eventsPayload, ["upcomingEvents", "upcomingCount"]),
+          completedEvents: completedEvents || getCountFromPayload(eventsPayload, ["completedEvents", "completedCount"]),
+          bookings: bookings.length || getCountFromPayload(bookingsPayload, ["totalBookings", "bookingsCount", "count", "total"]),
+          pendingEvents: pendingEvents || getCountFromPayload(eventsPayload, ["pendingEvents", "pendingCount"]),
+          liveEvents: liveEvents || getCountFromPayload(eventsPayload, ["liveEvents", "liveCount"]),
+          cancelledBookings: cancelledBookings || getCountFromPayload(bookingsPayload, ["cancelledBookings", "cancelledCount"]),
         });
       } catch (error) {
         console.error(error);
@@ -42,6 +103,14 @@ function AdminDashboardPage() {
     };
 
     loadStats();
+    const refreshId = window.setInterval(loadStats, 15000);
+    const onFocus = () => loadStats();
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      window.clearInterval(refreshId);
+      window.removeEventListener("focus", onFocus);
+    };
   }, []);
 
   return (
@@ -68,6 +137,8 @@ function AdminDashboardPage() {
               Approve and manage all events
               <br />
               Pending: {stats.pendingEvents} | Live: {stats.liveEvents}
+              <br />
+              Upcoming: {stats.upcomingEvents} | Completed: {stats.completedEvents}
             </div>
             <div style={{ marginTop: "14px" }}>
               <Link to="/admin/events">Open</Link>
