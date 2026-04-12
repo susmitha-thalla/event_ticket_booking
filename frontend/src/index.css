@@ -332,9 +332,29 @@ select option {
 
 .events-gallery {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 20px;
   align-items: start;
+}
+
+@media (max-width: 1200px) {
+  .events-gallery {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 992px) {
+  .events-gallery {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.events-action-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  margin-bottom: 1.5rem;
 }
 
 .event-poster-card {
@@ -716,6 +736,17 @@ form {
   position: relative;
   overflow: hidden;
   border: 1px solid #dbe5f3;
+}
+
+.portal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.portal-actions p {
+  margin: 0;
 }
 
 .portal-card::before {

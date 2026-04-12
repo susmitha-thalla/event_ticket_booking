@@ -30,27 +30,35 @@ function HomePage() {
           <div className="card portal-card portal-user">
             <div className="card-title">User Portal</div>
             <p className="subtext">Browse approved events, filter by category and location, and book tickets.</p>
-            <p><Link to="/user/signup">Create User Account</Link></p>
-            <p><Link to="/user/login">User Login</Link></p>
+            <div className="portal-actions">
+              <p><Link to="/user/signup">Create User Account</Link></p>
+              <p><Link to="/user/login">User Login</Link></p>
+            </div>
           </div>
 
           <div className="card portal-card portal-organizer">
             <div className="card-title">Organizer Portal</div>
             <p className="subtext">Create events, track your listings, and view bookings on your hosted events.</p>
-            <p><Link to="/organizer/signup">Create Organizer Account</Link></p>
-            <p><Link to="/organizer/login">Organizer Login</Link></p>
+            <div className="portal-actions">
+              <p><Link to="/organizer/signup">Create Organizer Account</Link></p>
+              <p><Link to="/organizer/login">Organizer Login</Link></p>
+            </div>
           </div>
 
           <div className="card portal-card portal-admin">
             <div className="card-title">Admin Portal</div>
             <p className="subtext">Approve events, monitor users, and manage the full platform.</p>
-            <p><Link to="/admin/login">Admin Login</Link></p>
+            <div className="portal-actions">
+              <p><Link to="/admin/login">Admin Login</Link></p>
+            </div>
           </div>
 
           <div className="card portal-card portal-explore">
             <div className="card-title">Explore Events</div>
             <p className="subtext">Jump directly to the approved events page and start browsing.</p>
-            <p><Link to="/events">View Approved Events</Link></p>
+            <div className="portal-actions">
+              <p><Link to="/events">View Approved Events</Link></p>
+            </div>
           </div>
         </div>
       </div>

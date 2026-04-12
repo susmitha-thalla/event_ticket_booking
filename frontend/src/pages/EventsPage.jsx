@@ -329,7 +329,7 @@ function EventsPage() {
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginTop: "12px" }}>
+        <div className="events-action-row">
           <button onClick={clearLocalFilters} className="secondary">
             Clear Filters
           </button>
