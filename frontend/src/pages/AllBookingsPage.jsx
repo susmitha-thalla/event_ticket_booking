@@ -34,7 +34,7 @@ function AllBookingsPage() {
           return;
         }
 
-        setErrorMessage("");
+        setErrorMessage("Failed to load admin bookings right now. Please try again.");
       } finally {
         setLoading(false);
       }

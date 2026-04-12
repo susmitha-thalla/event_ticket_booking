@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { bookTicket } from "../services/bookingService";
+import { bookSeatSelection, bookTicket } from "../services/bookingService";
 import { getSeatMapByEvent } from "../services/seatService";
 import Navbar from "../components/Navbar";
 
@@ -26,19 +26,6 @@ function BookingPage() {
   const [selectedApp, setSelectedApp] = useState("");
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [seatMap, setSeatMap] = useState([]);
-
-  if (!event) {
-    return (
-      <>
-        <Navbar />
-        <div className="container">
-          <div className="card">
-            <h2>No event selected</h2>
-          </div>
-        </div>
-      </>
-    );
-  }
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -68,6 +55,19 @@ function BookingPage() {
     }
     return Object.entries(groups).sort((a, b) => a[0].localeCompare(b[0]));
   }, [seatMap]);
+
+  if (!event) {
+    return (
+      <>
+        <Navbar />
+        <div className="container">
+          <div className="card">
+            <h2>No event selected</h2>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   const toggleSeatSelection = (seatCode) => {
     setSelectedSeats((previous) => {
@@ -119,14 +119,20 @@ function BookingPage() {
         };
 
         if (requiresSeatSelection) {
-          const groupedSeatBooking = await bookTicket({
+          const groupedSeatBooking = await bookSeatSelection({
             ...basePayload,
             seatNumbers: selectedSeats,
-            quantity: selectedSeats.length,
           });
 
           setProcessingPayment(false);
           setShowPaymentModal(false);
+          if (groupedSeatBooking?.warningMessage) {
+            const failedSeatList = groupedSeatBooking?.failedSeats?.join(", ");
+            const warningText = failedSeatList
+              ? `${groupedSeatBooking.warningMessage} Failed seats: ${failedSeatList}`
+              : groupedSeatBooking.warningMessage;
+            alert(warningText);
+          }
           navigate("/booking-success", { state: { booking: groupedSeatBooking } });
           return;
         } else {
