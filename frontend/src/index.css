@@ -12,6 +12,9 @@
   --warn-text: #92400e;
   --danger-bg: #ffe6e6;
   --danger-text: #991b1b;
+  --navy-1: #0b1f4d;
+  --navy-2: #123a8a;
+  --navy-3: #2563eb;
   --banner-music: linear-gradient(135deg, #7f1d1d, #be123c);
   --banner-standup: linear-gradient(135deg, #92400e, #f97316);
   --banner-night: linear-gradient(135deg, #0f172a, #164e63);
@@ -27,10 +30,15 @@
 
 body {
   position: relative;
-  background:
-    radial-gradient(circle at top right, rgba(15, 23, 42, 0.08), transparent 38%),
-    radial-gradient(circle at top left, rgba(100, 116, 139, 0.08), transparent 40%),
-    var(--bg);
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(rgba(15, 23, 42, 0.42), rgba(15, 23, 42, 0.42)),
+    url("/site-background.jpg");
+  background-position: 50% 50%;
+  background-repeat: no-repeat;
+  background-size: 112% 112%;
+  background-attachment: fixed;
+  animation: bgDrift 26s ease-in-out infinite alternate;
   color: var(--text);
   min-height: 100vh;
   overflow-x: hidden;
@@ -47,10 +55,11 @@ body::after {
 
 body::before {
   background:
-    radial-gradient(circle at 20% 25%, rgba(148, 163, 184, 0.2), transparent 18%),
-    radial-gradient(circle at 75% 18%, rgba(100, 116, 139, 0.14), transparent 16%),
-    radial-gradient(circle at 65% 70%, rgba(148, 163, 184, 0.12), transparent 20%),
-    radial-gradient(circle at 30% 80%, rgba(71, 85, 105, 0.09), transparent 18%);
+    radial-gradient(circle at 20% 25%, rgba(148, 163, 184, 0.14), transparent 18%),
+    radial-gradient(circle at 75% 18%, rgba(100, 116, 139, 0.1), transparent 16%),
+    radial-gradient(circle at 65% 70%, rgba(148, 163, 184, 0.08), transparent 20%),
+    radial-gradient(circle at 30% 80%, rgba(71, 85, 105, 0.07), transparent 18%);
+  opacity: 0.48;
   animation: stageGlow 18s ease-in-out infinite alternate;
   filter: blur(1px);
 }
@@ -59,7 +68,8 @@ body::after {
   background-image:
     linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.24) 20%, transparent 40%),
     linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.2) 50%, transparent 70%);
-  background-size: 220% 220%;
+  background-size: 230% 230%;
+  opacity: 0.28;
   animation: lightSweep 22s linear infinite, stagePulse 8s ease-in-out infinite;
   mix-blend-mode: soft-light;
 }
@@ -117,28 +127,48 @@ body::after {
 }
 
 button {
-  background: var(--primary);
-  color: #fff;
-  border: none;
-  padding: 10px 16px;
-  border-radius: 10px;
+  background: linear-gradient(135deg, var(--navy-1) 0%, var(--navy-2) 56%, var(--navy-3) 100%);
+  color: #f8fbff;
+  border: 1px solid rgba(191, 219, 254, 0.36);
+  padding: 10px 18px;
+  border-radius: 12px;
   cursor: pointer;
-  transition: transform 0.16s ease, background 0.2s ease;
+  transition: transform 0.16s ease, box-shadow 0.2s ease, filter 0.2s ease;
   margin-top: 10px;
   font-weight: 600;
+  box-shadow: 0 8px 18px rgba(2, 6, 23, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 
 button:hover {
-  transform: translateY(-1px);
-  background: var(--primary-strong);
+  transform: translateY(-2px);
+  filter: brightness(1.05);
+  box-shadow: 0 10px 22px rgba(2, 6, 23, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+button:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: 0 4px 12px rgba(2, 6, 23, 0.24);
+}
+
+button:focus-visible {
+  outline: 3px solid rgba(96, 165, 250, 0.4);
+  outline-offset: 2px;
+}
+
+button:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+  filter: grayscale(0.12);
 }
 
 button.secondary {
-  background: #1f2937;
+  background: linear-gradient(135deg, #1e293b, #334155);
 }
 
 button.danger {
-  background: #b42323;
+  background: linear-gradient(135deg, #7f1d1d, #b91c1c);
 }
 
 input,
@@ -156,12 +186,26 @@ textarea {
 
 .select-field {
   appearance: none;
-  background-image: linear-gradient(45deg, transparent 50%, #1d4ed8 50%),
-    linear-gradient(135deg, #1d4ed8 50%, transparent 50%);
+  background-image:
+    linear-gradient(45deg, transparent 50%, #1e3a8a 50%),
+    linear-gradient(135deg, #1e3a8a 50%, transparent 50%),
+    linear-gradient(180deg, #ffffff, #f3f7ff);
   background-position: calc(100% - 18px) calc(50% - 3px), calc(100% - 12px) calc(50% - 3px);
-  background-size: 6px 6px, 6px 6px;
+  background-size: 6px 6px, 6px 6px, 100% 100%;
   background-repeat: no-repeat;
   padding-right: 40px;
+  border-color: #b9c8e3;
+  color: #0f172a;
+}
+
+select:hover,
+.select-field:hover {
+  border-color: #7fa2de;
+}
+
+select option {
+  color: #0f172a;
+  background: #f8fbff;
 }
 
 .events-filter-card {
@@ -205,11 +249,13 @@ textarea {
   align-items: center;
   gap: 8px;
   font-weight: 700;
+  box-shadow: none;
 }
 
 .filter-chip:hover {
   background: #eef2f7;
   transform: none;
+  box-shadow: none;
 }
 
 .filter-chip.active {
@@ -438,6 +484,34 @@ a {
 
 a:hover {
   color: #111827;
+}
+
+.stat-box a,
+.portal-card a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  border-radius: 10px;
+  color: #f8fbff;
+  background: linear-gradient(135deg, var(--navy-1) 0%, var(--navy-2) 58%, var(--navy-3) 100%);
+  border: 1px solid rgba(191, 219, 254, 0.34);
+  box-shadow: 0 8px 16px rgba(2, 6, 23, 0.2);
+  transition: transform 0.16s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.stat-box a:hover,
+.portal-card a:hover {
+  color: #f8fbff;
+  transform: translateY(-2px);
+  filter: brightness(1.06);
+  box-shadow: 0 10px 22px rgba(2, 6, 23, 0.26);
+}
+
+.stat-box a:active,
+.portal-card a:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: 0 4px 12px rgba(2, 6, 23, 0.2);
 }
 
 form {
@@ -724,6 +798,15 @@ form {
   }
 }
 
+@keyframes bgDrift {
+  0% {
+    background-position: 48% 50%;
+  }
+  100% {
+    background-position: 52% 45%;
+  }
+}
+
 @keyframes stageGlow {
   0% {
     transform: translateY(0);
@@ -763,6 +846,20 @@ form {
   50% {
     opacity: 0.72;
     transform: scale(1.02);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body,
+  body::before,
+  body::after {
+    animation: none !important;
+  }
+
+  button,
+  .stat-box a,
+  .portal-card a {
+    transition: none !important;
   }
 }
 
