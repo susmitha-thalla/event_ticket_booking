@@ -42,6 +42,7 @@ const getThemeClassFromCategory = (category = "") => {
 
 function EventsPage() {
   const [allEvents, setAllEvents] = useState([]);
+  const [failedWallpaperKeys, setFailedWallpaperKeys] = useState(new Set());
   const [selectedCategory, setSelectedCategory] = useState("");
   const [locationInput, setLocationInput] = useState("");
   const [start, setStart] = useState("");
@@ -61,6 +62,7 @@ function EventsPage() {
       setLoading(true);
       const data = await getAllEvents();
       setAllEvents(toDisplayableUserEvents(data));
+      setFailedWallpaperKeys(new Set());
       setActiveView("ALL");
     } catch (error) {
       console.error(error);
@@ -96,6 +98,7 @@ function EventsPage() {
       if (view === "SEAT_BASED") data = await getSeatBasedEvents();
       if (view === "NON_SEAT_BASED") data = await getNonSeatBasedEvents();
       setAllEvents(toDisplayableUserEvents(data));
+      setFailedWallpaperKeys(new Set());
     } catch (error) {
       console.error(error);
       alert("Failed to load selected event view");
@@ -196,6 +199,17 @@ function EventsPage() {
     setMaxPrice("");
     setStart("");
     setEnd("");
+  };
+
+  const getEventKey = (event) =>
+    String(event?.eventId ?? `${event?.title || "event"}-${event?.eventDate || "date"}`);
+
+  const markWallpaperAsFailed = (eventKey) => {
+    setFailedWallpaperKeys((previous) => {
+      const next = new Set(previous);
+      next.add(eventKey);
+      return next;
+    });
   };
 
   return (
@@ -346,13 +360,14 @@ function EventsPage() {
             </div>
           ) : visibleEvents.length > 0 ? (
             visibleEvents.map((event) => (
-              <div className="event-poster-card" key={event.eventId}>
+              <div className="event-poster-card" key={getEventKey(event)}>
                 <div className="event-poster-media">
-                  {event.wallpaperUrl ? (
+                  {event.wallpaperUrl && !failedWallpaperKeys.has(getEventKey(event)) ? (
                     <img
                       src={event.wallpaperUrl}
                       alt={`${event.title} wallpaper`}
                       className="event-poster-image"
+                      onError={() => markWallpaperAsFailed(getEventKey(event))}
                     />
                   ) : (
                     <div className={`event-theme ${getThemeClassFromCategory(event.category)}`}>

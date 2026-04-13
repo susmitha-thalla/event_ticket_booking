@@ -22,8 +22,13 @@ const QR_IMAGE_EXTENSIONS = /\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i;
 const USER_BOOKING_ENDPOINT_CANDIDATES = [
   "/bookings/my-bookings",
   "/bookings/user-bookings",
+  "/bookings/my",
+  "/bookings/my-booking",
+  "/bookings/me/bookings",
+  "/bookings/user/me",
   "/bookings/me",
   "/bookings/user",
+  "/user/bookings",
   "/users/bookings",
 ];
 const ORGANIZER_BOOKING_ENDPOINT_CANDIDATES = [
@@ -67,6 +72,22 @@ const toNumeric = (value, fallback = 0) => {
 };
 const hasBrowserStorage = () => typeof window !== "undefined" && Boolean(window.localStorage);
 const isAuthStatus = (status) => status === 401 || status === 403;
+const parseJwtPayload = (token) => {
+  const normalizedToken = normalizeString(token);
+  if (!normalizedToken || !normalizedToken.includes(".")) return null;
+  try {
+    const base64Payload = normalizedToken.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded =
+      base64Payload + "=".repeat((4 - (base64Payload.length % 4)) % 4);
+    const decoded =
+      typeof atob === "function"
+        ? atob(padded)
+        : Buffer.from(padded, "base64").toString("utf-8");
+    return JSON.parse(decoded);
+  } catch {
+    return null;
+  }
+};
 
 const isLikelyBase64Image = (value) => {
   const normalized = normalizeString(value).replace(/\s+/g, "");
@@ -259,7 +280,25 @@ const extractObjectFromPayload = (payload, depth = 0) => {
   return parsed;
 };
 
-const getCurrentEmail = () => normalizeString(localStorage.getItem("email")).toLowerCase();
+const getCurrentEmail = () => {
+  if (!hasBrowserStorage()) return "";
+  const storedEmail = normalizeString(localStorage.getItem("email")).toLowerCase();
+  if (storedEmail) return storedEmail;
+
+  const rawToken =
+    normalizeString(localStorage.getItem("token")) ||
+    normalizeString(localStorage.getItem("accessToken")) ||
+    normalizeString(localStorage.getItem("jwt"));
+  const token = rawToken.toLowerCase().startsWith("bearer ")
+    ? rawToken.slice(7).trim()
+    : rawToken;
+
+  const payload = parseJwtPayload(token);
+  const tokenEmail = normalizeString(
+    payload?.email || payload?.sub || payload?.username || payload?.userEmail
+  ).toLowerCase();
+  return tokenEmail;
+};
 const getUserBookingsCacheKey = () => {
   const email = getCurrentEmail();
   return email ? `${USER_BOOKINGS_CACHE_PREFIX}${email}` : "";
@@ -342,7 +381,7 @@ const requestFirstSuccessfulGet = async (endpointCandidates) => {
     } catch (error) {
       const status = error?.response?.status;
 
-      if (status === 401 || status === 403) {
+      if (isAuthStatus(status)) {
         if (!firstAuthError) firstAuthError = error;
         continue;
       }
@@ -356,7 +395,7 @@ const requestFirstSuccessfulGet = async (endpointCandidates) => {
     }
   }
 
-  throw firstAuthError || firstOtherError || firstNotFoundError || new Error("Request failed");
+  throw firstOtherError || firstNotFoundError || firstAuthError || new Error("Request failed");
 };
 
 const parseBookingList = (payload) => {
@@ -374,6 +413,69 @@ const dedupeBookings = (bookings = []) => {
     if (!uniqueMap.has(id)) uniqueMap.set(id, booking);
   }
   return Array.from(uniqueMap.values());
+};
+
+const normalizeBookingsList = (bookings = []) =>
+  dedupeBookings((bookings || []).map((booking) => normalizeBooking(booking)).filter(Boolean));
+
+const selectBestError = (errors = []) => {
+  const normalizedErrors = (errors || []).filter(Boolean);
+  if (normalizedErrors.length === 0) return new Error("Unable to load bookings right now.");
+
+  const firstNonAuthError = normalizedErrors.find(
+    (error) => !isAuthStatus(error?.response?.status)
+  );
+  return firstNonAuthError || normalizedErrors[0];
+};
+
+const resolveBookingsWithLoaders = async (loaders = []) => {
+  const errors = [];
+  let firstEmptyResult = null;
+
+  for (const loader of loaders) {
+    try {
+      const result = normalizeBookingsList(await loader());
+      if (result.length > 0) return result;
+      if (firstEmptyResult === null) firstEmptyResult = result;
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+
+  if (firstEmptyResult !== null) return firstEmptyResult;
+  throw selectBestError(errors);
+};
+
+const getCachedUserBookings = () => {
+  const key = getUserBookingsCacheKey();
+  const cached = readLocalStorageJson(key, []);
+  return normalizeBookingsList(cached);
+};
+
+const setCachedUserBookings = (bookings = []) => {
+  const key = getUserBookingsCacheKey();
+  if (!key) return;
+  writeLocalStorageJson(key, normalizeBookingsList(bookings));
+};
+
+const upsertCachedUserBookings = (bookings = []) => {
+  const merged = normalizeBookingsList([...normalizeBookingsList(bookings), ...getCachedUserBookings()]);
+  setCachedUserBookings(merged);
+  return merged;
+};
+
+const getCachedAdminBookings = () => {
+  const cached = readLocalStorageJson(ADMIN_BOOKINGS_CACHE_KEY, []);
+  return normalizeBookingsList(cached);
+};
+
+const setCachedAdminBookings = (bookings = []) => {
+  writeLocalStorageJson(ADMIN_BOOKINGS_CACHE_KEY, normalizeBookingsList(bookings));
+};
+
+const loadBookingsFromEndpoints = async (endpointCandidates = []) => {
+  const payload = await requestFirstSuccessfulGet(endpointCandidates);
+  return parseBookingList(payload);
 };
 
 const filterBookingsForCurrentUser = (bookings = []) => {
@@ -403,8 +505,27 @@ const filterBookingsForCurrentOrganizer = (bookings = []) => {
 const shouldTryPerEventFallback = (error) => {
   const status = error?.response?.status;
   if (!status) return true;
-  return status >= 500 || status === 408 || status === 413 || status === 429;
+  return (
+    status >= 500 ||
+    status === 400 ||
+    status === 403 ||
+    status === 404 ||
+    status === 405 ||
+    status === 408 ||
+    status === 413 ||
+    status === 429
+  );
 };
+
+const buildEventBookingEndpointCandidates = (eventId) => [
+  `/bookings/event/${eventId}`,
+  `/bookings/events/${eventId}`,
+  `/bookings/by-event/${eventId}`,
+  `/bookings/event-bookings/${eventId}`,
+  `/bookings/organizer-bookings/event/${eventId}`,
+  `/organizer/bookings/event/${eventId}`,
+  `/events/${eventId}/bookings`,
+];
 
 const fetchBookingsForEvent = async (eventId, endpointCandidates = []) => {
   if (!eventId) return [];
@@ -416,10 +537,31 @@ const fetchBookingsForEvent = async (eventId, endpointCandidates = []) => {
   return parsedBookings;
 };
 
+const getMergedEventIdsFromEndpoints = async (endpointCandidates = []) => {
+  const eventIds = new Set();
+  const errors = [];
+
+  for (const endpoint of endpointCandidates) {
+    try {
+      const payload = await requestFirstSuccessfulGet([endpoint]);
+      const events = extractArrayFromPayload(payload, ["events", "content", "items", "results"]);
+      for (const event of events || []) {
+        if (event?.eventId) eventIds.add(event.eventId);
+      }
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+
+  if (eventIds.size > 0) {
+    return Array.from(eventIds);
+  }
+
+  throw selectBestError(errors);
+};
+
 const getAllBookingsViaEvents = async () => {
-  const eventsPayload = await requestFirstSuccessfulGet(["/events/admin/all", "/events/all"]);
-  const events = extractArrayFromPayload(eventsPayload, ["events", "content", "items", "results"]);
-  const eventIds = [...new Set((events || []).map((event) => event?.eventId).filter(Boolean))];
+  const eventIds = await getMergedEventIdsFromEndpoints(EVENT_LIST_ENDPOINT_CANDIDATES);
 
   if (eventIds.length === 0) {
     return [];
@@ -430,16 +572,13 @@ const getAllBookingsViaEvents = async () => {
 
   for (const eventId of eventIds) {
     try {
-      const endpointCandidates = [
-        `/bookings/event/${eventId}`,
-        `/bookings/organizer-bookings/event/${eventId}`,
-      ];
+      const endpointCandidates = buildEventBookingEndpointCandidates(eventId);
       const eventBookings = await fetchBookingsForEvent(eventId, endpointCandidates);
       successfulEventRequests += 1;
       mergedBookings.push(...eventBookings);
     } catch (error) {
       const status = error?.response?.status;
-      if (status === 404 || status === 400) {
+      if (status === 404 || status === 400 || status === 403 || status === 405) {
         continue;
       }
     }
@@ -453,9 +592,11 @@ const getAllBookingsViaEvents = async () => {
 };
 
 const getOrganizerBookingsViaEvents = async () => {
-  const myEventsPayload = await requestFirstSuccessfulGet(["/events/my-events"]);
-  const myEvents = extractArrayFromPayload(myEventsPayload, ["events", "content", "items", "results"]);
-  const eventIds = [...new Set((myEvents || []).map((event) => event?.eventId).filter(Boolean))];
+  const eventIds = await getMergedEventIdsFromEndpoints([
+    "/events/my-events",
+    "/organizer/events",
+    "/events/organizer",
+  ]);
 
   if (eventIds.length === 0) {
     return [];
@@ -466,10 +607,7 @@ const getOrganizerBookingsViaEvents = async () => {
 
   for (const eventId of eventIds) {
     try {
-      const endpointCandidates = [
-        `/bookings/organizer-bookings/event/${eventId}`,
-        `/bookings/event/${eventId}`,
-      ];
+      const endpointCandidates = buildEventBookingEndpointCandidates(eventId);
       const eventBookings = await fetchBookingsForEvent(eventId, endpointCandidates);
       successfulRequests += 1;
       mergedBookings.push(...eventBookings);
@@ -574,7 +712,9 @@ export const bookTicket = async (data) => {
         ...getAuthHeader(),
       },
     });
-    return parseBookingObject(response.data);
+    const booking = parseBookingObject(response.data);
+    upsertCachedUserBookings([booking]);
+    return booking;
   } catch (error) {
     const status = error?.response?.status;
     if (status !== 401 && status !== 403) {
@@ -586,7 +726,9 @@ export const bookTicket = async (data) => {
         ...getAuthHeader(),
       },
     });
-    return parseBookingObject(retryResponse.data);
+    const booking = parseBookingObject(retryResponse.data);
+    upsertCachedUserBookings([booking]);
+    return booking;
   }
 };
 
@@ -637,62 +779,88 @@ export const bookSeatSelection = async (data) => {
     mergedBooking.failedSeats = failedSeats;
   }
 
+  upsertCachedUserBookings(successfulBookings);
   return mergedBooking;
 };
 
 export const getMyBookings = async () => {
+  const cachedBookings = getCachedUserBookings();
+  const errors = [];
+
   try {
-    const payload = await requestFirstSuccessfulGet([
-      "/bookings/my-bookings",
-      "/bookings/me",
-      "/bookings/user-bookings",
+    const directBookings = await resolveBookingsWithLoaders([
+      () => loadBookingsFromEndpoints(USER_BOOKING_ENDPOINT_CANDIDATES),
     ]);
-    return parseBookingList(payload);
-  } catch {
-    const fallbackPayload = await requestFirstSuccessfulGet([
-      "/bookings/all",
-      "/bookings/admin/all",
-    ]);
-    return filterBookingsForCurrentUser(parseBookingList(fallbackPayload));
+    const merged = normalizeBookingsList([...directBookings, ...cachedBookings]);
+    setCachedUserBookings(merged);
+    return merged;
+  } catch (error) {
+    errors.push(error);
   }
+
+  try {
+    const fallbackBookings = await resolveBookingsWithLoaders([
+      async () => filterBookingsForCurrentUser(await loadBookingsFromEndpoints(ADMIN_BOOKING_ENDPOINT_CANDIDATES)),
+      async () => filterBookingsForCurrentUser(await getAllBookingsViaEvents()),
+      async () => filterBookingsForCurrentUser(await getAllBookings()),
+    ]);
+    const merged = normalizeBookingsList([...fallbackBookings, ...cachedBookings]);
+    setCachedUserBookings(merged);
+    return merged;
+  } catch (error) {
+    errors.push(error);
+  }
+
+  if (cachedBookings.length > 0) {
+    return cachedBookings;
+  }
+
+  throw selectBestError(errors);
 };
 
 export const getOrganizerBookings = async () => {
-  try {
-    const payload = await requestFirstSuccessfulGet([
-      "/bookings/organizer-bookings",
-      "/bookings/organizer/all",
-      "/organizer/bookings",
-    ]);
-    return parseBookingList(payload);
-  } catch {
-    try {
-      return await getOrganizerBookingsViaEvents();
-    } catch {
-      const allBookingsPayload = await requestFirstSuccessfulGet([
-        "/bookings/all",
-        "/bookings/admin/all",
-      ]);
-      return filterBookingsForCurrentOrganizer(parseBookingList(allBookingsPayload));
-    }
-  }
+  return resolveBookingsWithLoaders([
+    () => loadBookingsFromEndpoints(ORGANIZER_BOOKING_ENDPOINT_CANDIDATES),
+    () => getOrganizerBookingsViaEvents(),
+    async () => filterBookingsForCurrentOrganizer(await loadBookingsFromEndpoints(ADMIN_BOOKING_ENDPOINT_CANDIDATES)),
+    async () => filterBookingsForCurrentOrganizer(await getAllBookingsViaEvents()),
+  ]);
 };
 
 export const getAllBookings = async () => {
-  try {
-    const payload = await requestFirstSuccessfulGet([
-      "/bookings/all",
-      "/bookings/admin/all",
-      "/admin/bookings/all",
-    ]);
-    return parseBookingList(payload);
-  } catch (error) {
-    if (!shouldTryPerEventFallback(error)) {
-      throw error;
-    }
+  const cachedAdminBookings = getCachedAdminBookings();
+  const errors = [];
 
-    return getAllBookingsViaEvents();
+  try {
+    const bookings = await resolveBookingsWithLoaders([
+      () => loadBookingsFromEndpoints(ADMIN_BOOKING_ENDPOINT_CANDIDATES),
+    ]);
+    const merged = normalizeBookingsList([...bookings, ...cachedAdminBookings]);
+    setCachedAdminBookings(merged);
+    return merged;
+  } catch (error) {
+    errors.push(error);
+    if (!shouldTryPerEventFallback(error) && cachedAdminBookings.length > 0) {
+      return cachedAdminBookings;
+    }
   }
+
+  try {
+    const bookingsViaEvents = await resolveBookingsWithLoaders([
+      () => getAllBookingsViaEvents(),
+    ]);
+    const merged = normalizeBookingsList([...bookingsViaEvents, ...cachedAdminBookings]);
+    setCachedAdminBookings(merged);
+    return merged;
+  } catch (error) {
+    errors.push(error);
+  }
+
+  if (cachedAdminBookings.length > 0) {
+    return cachedAdminBookings;
+  }
+
+  throw selectBestError(errors);
 };
 
 export const getBookingsByEventId = async (eventId) => {

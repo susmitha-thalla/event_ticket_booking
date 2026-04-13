@@ -92,10 +92,22 @@ const resolveCount = (records, payload, keys = []) => {
   return 0;
 };
 
+const dedupeByKey = (records = [], resolver) => {
+  const unique = new Map();
+  for (const item of records || []) {
+    if (!item || typeof item !== "object") continue;
+    const rawKey = resolver(item);
+    const key = rawKey === null || rawKey === undefined ? JSON.stringify(item) : String(rawKey);
+    if (!unique.has(key)) unique.set(key, item);
+  }
+  return Array.from(unique.values());
+};
+
 function AdminDashboardPage() {
   const [stats, setStats] = useState({
     users: 0,
     events: 0,
+    approvedEvents: 0,
     upcomingEvents: 0,
     completedEvents: 0,
     bookings: 0,
@@ -135,8 +147,14 @@ function AdminDashboardPage() {
       const users = getArrayFromPayload(usersPayload, ["users", "content", "items", "results"]);
       const events = getArrayFromPayload(eventsPayload, ["events", "content", "items", "results"]);
       const bookings = getArrayFromPayload(bookingsPayload, ["bookings", "content", "items", "results"]);
+      const uniqueUsers = dedupeByKey(users, (user) => user?.userId ?? user?.id ?? user?.email);
+      const uniqueEvents = dedupeByKey(events, (event) => event?.eventId ?? event?.id);
+      const uniqueBookings = dedupeByKey(
+        bookings,
+        (booking) => booking?.bookingId ?? booking?.id ?? booking?.bookingCode
+      );
 
-      const deletedOrCancelledEvents = (events || []).filter((event) => {
+      const deletedOrCancelledEvents = (uniqueEvents || []).filter((event) => {
         const status = String(event?.eventStatus || "").toUpperCase();
         return (
           event?.isDeleted ||
@@ -146,7 +164,7 @@ function AdminDashboardPage() {
         );
       });
 
-      const visibleEvents = (events || []).filter(
+      const visibleEvents = (uniqueEvents || []).filter(
         (event) => !deletedOrCancelledEvents.some((removedEvent) => removedEvent?.eventId === event?.eventId)
       );
 
@@ -161,10 +179,11 @@ function AdminDashboardPage() {
       };
 
       const pendingEvents = visibleEvents.filter((event) => String(event?.approvalStatus || "").toUpperCase() !== "APPROVED").length;
+      const approvedEvents = visibleEvents.filter((event) => String(event?.approvalStatus || "").toUpperCase() === "APPROVED").length;
       const liveEvents = visibleEvents.filter((event) => String(event?.eventStatus || "").toUpperCase() === "LIVE").length;
       const completedEvents = visibleEvents.filter((event) => isCompleted(event)).length;
       const upcomingEvents = visibleEvents.filter((event) => !isCompleted(event)).length;
-      const cancelledBookings = bookings.filter((booking) => {
+      const cancelledBookings = uniqueBookings.filter((booking) => {
         const status = String(booking?.bookingStatus || booking?.status || "").toUpperCase();
         return status === "CANCELLED" || status === "CANCELED";
       }).length;
@@ -183,11 +202,12 @@ function AdminDashboardPage() {
       );
 
       setStats({
-        users: resolveCount(users, usersPayload, ["totalUsers", "usersCount", "count", "total", "totalElements"]),
-        events: resolveCount(visibleEvents, eventsPayload, ["totalEvents", "eventsCount", "count", "total", "totalElements"]),
+        users: resolveCount(uniqueUsers, usersPayload, ["totalUsers", "usersCount", "count", "total", "totalElements"]),
+        events: resolveCount(uniqueEvents, eventsPayload, ["totalEvents", "eventsCount", "count", "total", "totalElements"]),
+        approvedEvents: approvedEvents || getCountFromPayload(eventsPayload, ["approvedEvents", "approvedCount"]) || 0,
         upcomingEvents: upcomingEvents || getCountFromPayload(eventsPayload, ["upcomingEvents", "upcomingCount"]) || 0,
         completedEvents: completedEvents || getCountFromPayload(eventsPayload, ["completedEvents", "completedCount"]) || 0,
-        bookings: resolveCount(bookings, bookingsPayload, ["totalBookings", "bookingsCount", "count", "total", "totalElements"]),
+        bookings: resolveCount(uniqueBookings, bookingsPayload, ["totalBookings", "bookingsCount", "count", "total", "totalElements"]),
         pendingEvents: pendingEvents || getCountFromPayload(eventsPayload, ["pendingEvents", "pendingCount"]) || 0,
         liveEvents: liveEvents || getCountFromPayload(eventsPayload, ["liveEvents", "liveCount"]) || 0,
         cancelledBookings: cancelledBookings || getCountFromPayload(bookingsPayload, ["cancelledBookings", "cancelledCount"]) || 0,
@@ -233,7 +253,9 @@ function AdminDashboardPage() {
             <div className="stat-label">
               Approve and manage all events
               <br />
-              Pending: {stats.pendingEvents} | Live: {stats.liveEvents}
+              Approved: {stats.approvedEvents} | Pending: {stats.pendingEvents}
+              <br />
+              Live: {stats.liveEvents}
               <br />
               Upcoming: {stats.upcomingEvents} | Completed: {stats.completedEvents}
               <br />
