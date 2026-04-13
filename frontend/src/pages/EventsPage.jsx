@@ -20,6 +20,7 @@ const formatDateTime = (value) => {
 
 const formatAmount = (value) => Number(value || 0).toFixed(2);
 const isEventDeleted = (event) => event?.isDeleted || event?.eventStatus === "DELETED";
+const isSoldOut = (event) => Number(event?.availableSeats || 0) <= 0;
 const isEventCompleted = (event) => {
   if (!event) return false;
   if (event.eventStatus === "COMPLETED") return true;
@@ -383,12 +384,18 @@ function EventsPage() {
                   <div className="event-poster-meta">{event.category}</div>
                   <div className="event-poster-meta">₹{formatAmount(event.price)} per ticket</div>
                   <div className="event-poster-meta">Seats: {event.availableSeats}</div>
+                  {isSoldOut(event) && (
+                    <div className="event-poster-meta" style={{ color: "#991b1b", fontWeight: 700 }}>
+                      Status: SOLD OUT
+                    </div>
+                  )}
 
                   <button
                     className="event-poster-action"
+                    disabled={isSoldOut(event)}
                     onClick={() => navigate("/book", { state: { event } })}
                   >
-                    Book Now
+                    {isSoldOut(event) ? "Sold Out" : "Book Now"}
                   </button>
                 </div>
               </div>

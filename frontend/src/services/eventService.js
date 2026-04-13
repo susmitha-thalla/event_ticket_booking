@@ -47,6 +47,31 @@ const extractArrayFromPayload = (payload, preferredKeys = [], depth = 0) => {
   return [];
 };
 
+const extractObjectFromPayload = (payload, depth = 0) => {
+  const parsed = parseMaybeJson(payload);
+
+  if (!parsed || typeof parsed !== "object" || depth > 5) return {};
+  if (Array.isArray(parsed)) {
+    return parsed[0] && typeof parsed[0] === "object" ? parsed[0] : {};
+  }
+
+  const objectKeys = ["event", "item", "record"];
+  for (const key of objectKeys) {
+    if (parsed[key] && typeof parsed[key] === "object") return parsed[key];
+  }
+
+  for (const key of WRAPPER_KEYS) {
+    if (parsed[key] !== undefined) {
+      const nestedObject = extractObjectFromPayload(parsed[key], depth + 1);
+      if (nestedObject && Object.keys(nestedObject).length > 0) {
+        return nestedObject;
+      }
+    }
+  }
+
+  return parsed;
+};
+
 const buildAbsoluteUrlFromApiBase = (pathValue) => {
   const normalizedPath = normalizeString(pathValue).replace(/\\/g, "/");
   if (!normalizedPath) return "";
@@ -125,6 +150,7 @@ const dedupeEvents = (events = []) => {
 
 const parseEventList = (payload) =>
   dedupeEvents(extractArrayFromPayload(payload, ["events", "content", "items", "results"]));
+const parseEventObject = (payload) => normalizeEvent(extractObjectFromPayload(payload));
 
 const requestFirstSuccessfulEventGet = async (endpointCandidates = []) => {
   const headers = {
@@ -159,9 +185,67 @@ const requestFirstSuccessfulEventGet = async (endpointCandidates = []) => {
   throw firstOtherError || firstNotFoundError || firstAuthError || new Error("Unable to load events.");
 };
 
+const requestFirstSuccessfulEventMutation = async ({
+  method = "put",
+  endpointCandidates = [],
+  data,
+}) => {
+  const headers = {
+    ...getAuthHeader(),
+  };
+
+  let firstAuthError = null;
+  let firstNotFoundError = null;
+  let firstOtherError = null;
+
+  for (const endpoint of endpointCandidates) {
+    try {
+      const response = await api({
+        method,
+        url: endpoint,
+        data,
+        headers,
+      });
+      return response.data;
+    } catch (error) {
+      const status = error?.response?.status;
+
+      if (status === 401 || status === 403) {
+        if (!firstAuthError) firstAuthError = error;
+        continue;
+      }
+
+      if (status === 400 || status === 404 || status === 405) {
+        if (!firstNotFoundError) firstNotFoundError = error;
+        continue;
+      }
+
+      if (!firstOtherError) firstOtherError = error;
+    }
+  }
+
+  throw (
+    firstOtherError ||
+    firstNotFoundError ||
+    firstAuthError ||
+    new Error("Unable to perform event update.")
+  );
+};
+
 const getEventsFromCandidates = async (endpointCandidates = []) => {
   const payload = await requestFirstSuccessfulEventGet(endpointCandidates);
   return parseEventList(payload);
+};
+
+const getMostUsefulError = (errors = []) => {
+  const candidates = (errors || []).filter(Boolean);
+  if (candidates.length === 0) return new Error("Event action failed.");
+
+  const nonNotFound = candidates.find((error) => {
+    const status = error?.response?.status;
+    return status !== 400 && status !== 404 && status !== 405;
+  });
+  return nonNotFound || candidates[0];
 };
 
 const isCompletedEvent = (event) => {
@@ -224,6 +308,40 @@ export const createEvent = async (data) => {
     },
   });
   return response.data;
+};
+
+export const updateEvent = async (eventId, data) => {
+  const endpointCandidates = [
+    `/events/${eventId}`,
+    `/events/update/${eventId}`,
+    `/events/edit/${eventId}`,
+    `/events/organizer/${eventId}`,
+    `/organizer/events/${eventId}`,
+  ];
+  const methods = ["put", "patch", "post"];
+  const errors = [];
+
+  for (const method of methods) {
+    try {
+      const payload = await requestFirstSuccessfulEventMutation({
+        method,
+        endpointCandidates,
+        data,
+      });
+      const parsedEvent = parseEventObject(payload);
+      if (parsedEvent && Object.keys(parsedEvent).length > 0) {
+        return parsedEvent;
+      }
+      return normalizeEvent({
+        eventId,
+        ...data,
+      });
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+
+  throw getMostUsefulError(errors);
 };
 
 export const getMyEvents = async () =>
@@ -313,4 +431,64 @@ export const deleteEvent = async (eventId) => {
     },
   });
   return response.data;
+};
+
+export const cancelEvent = async (eventId) => {
+  const errors = [];
+  const cancellationPayload = {
+    eventStatus: "CANCELLED",
+    status: "CANCELLED",
+  };
+
+  try {
+    const updated = await updateEvent(eventId, cancellationPayload);
+    return normalizeEvent({
+      ...updated,
+      eventId: updated?.eventId ?? eventId,
+      eventStatus: "CANCELLED",
+      status: "CANCELLED",
+    });
+  } catch (error) {
+    errors.push(error);
+  }
+
+  const cancelEndpoints = [
+    `/events/cancel/${eventId}`,
+    `/events/${eventId}/cancel`,
+    `/organizer/events/${eventId}/cancel`,
+    `/events/cancel-event/${eventId}`,
+  ];
+  const methods = ["post", "put", "patch"];
+
+  for (const method of methods) {
+    try {
+      const payload = await requestFirstSuccessfulEventMutation({
+        method,
+        endpointCandidates: cancelEndpoints,
+        data: null,
+      });
+      const parsedEvent = parseEventObject(payload);
+      return normalizeEvent({
+        ...parsedEvent,
+        eventId: parsedEvent?.eventId ?? eventId,
+        eventStatus: "CANCELLED",
+        status: "CANCELLED",
+      });
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+
+  try {
+    await deleteEvent(eventId);
+    return normalizeEvent({
+      eventId,
+      isDeleted: true,
+      eventStatus: "DELETED",
+    });
+  } catch (error) {
+    errors.push(error);
+  }
+
+  throw getMostUsefulError(errors);
 };

@@ -407,10 +407,25 @@ const parseBookingObject = (payload) => normalizeBooking(extractObjectFromPayloa
 
 const dedupeBookings = (bookings = []) => {
   const uniqueMap = new Map();
-  for (const booking of bookings) {
+  for (const booking of bookings || []) {
+    if (!booking || typeof booking !== "object") continue;
+
     const id = booking?.bookingId ?? booking?.id ?? booking?.bookingCode;
-    if (id === null || id === undefined) continue;
-    if (!uniqueMap.has(id)) uniqueMap.set(id, booking);
+    const fallbackKey = JSON.stringify({
+      transactionCode: booking?.transactionCode,
+      userEmail: booking?.user?.email || booking?.userEmail || booking?.email,
+      eventId: booking?.event?.eventId ?? booking?.eventId,
+      bookingTime: booking?.bookingTime || booking?.createdAt,
+      seatNumbers: booking?.seatNumbers,
+      totalAmount: booking?.totalAmount,
+      quantity: booking?.quantity,
+    });
+    const key =
+      id === null || id === undefined || String(id).trim() === ""
+        ? fallbackKey
+        : String(id);
+
+    if (!uniqueMap.has(key)) uniqueMap.set(key, booking);
   }
   return Array.from(uniqueMap.values());
 };
