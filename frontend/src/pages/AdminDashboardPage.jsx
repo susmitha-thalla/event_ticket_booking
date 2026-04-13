@@ -5,26 +5,67 @@ import { getAllUsers } from "../services/adminService";
 import { getAdminAllEvents } from "../services/eventService";
 import { getAllBookings } from "../services/bookingService";
 
-const getArrayFromPayload = (payload, keys = []) => {
-  if (Array.isArray(payload)) return payload;
-  if (!payload || typeof payload !== "object") return [];
+const WRAPPER_KEYS = ["data", "payload", "result", "response", "body", "value"];
+const FALLBACK_ARRAY_KEYS = ["users", "events", "bookings", "content", "items", "results", "list", "records", "rows"];
 
-  for (const key of keys) {
-    if (Array.isArray(payload[key])) return payload[key];
+const parseMaybeJson = (value) => {
+  if (typeof value !== "string") return value;
+  const text = value.trim();
+  if (!text) return value;
+  const looksLikeJson = (text.startsWith("{") && text.endsWith("}")) || (text.startsWith("[") && text.endsWith("]"));
+  if (!looksLikeJson) return value;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return value;
+  }
+};
+
+const unwrapPayload = (payload, depth = 0) => {
+  const parsed = parseMaybeJson(payload);
+  if (depth > 5) return parsed;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return parsed;
+
+  for (const key of WRAPPER_KEYS) {
+    if (parsed[key] !== undefined) {
+      const nested = unwrapPayload(parsed[key], depth + 1);
+      if (nested !== undefined && nested !== null) {
+        return nested;
+      }
+    }
   }
 
-  if (Array.isArray(payload.data)) return payload.data;
-  if (payload.data && typeof payload.data === "object") {
-    for (const key of keys) {
-      if (Array.isArray(payload.data[key])) return payload.data[key];
+  return parsed;
+};
+
+const getArrayFromPayload = (payload, keys = [], depth = 0) => {
+  const parsed = parseMaybeJson(payload);
+  if (Array.isArray(parsed)) return parsed;
+  if (!parsed || typeof parsed !== "object" || depth > 5) return [];
+
+  const keysToCheck = [...keys, ...FALLBACK_ARRAY_KEYS];
+  for (const key of keysToCheck) {
+    if (Array.isArray(parsed[key])) return parsed[key];
+  }
+
+  for (const key of WRAPPER_KEYS) {
+    if (parsed[key] !== undefined) {
+      const nestedArray = getArrayFromPayload(parsed[key], keys, depth + 1);
+      if (nestedArray.length > 0) return nestedArray;
     }
+  }
+
+  const objectArrayValues = Object.values(parsed).filter(Array.isArray);
+  if (objectArrayValues.length > 0) {
+    return objectArrayValues.sort((a, b) => b.length - a.length)[0];
   }
 
   return [];
 };
 
 const getCountFromPayload = (payload, keys = []) => {
-  if (!payload || typeof payload !== "object") return null;
+  const parsed = unwrapPayload(payload);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
 
   const parseCount = (value) => {
     const parsed = Number(value);
@@ -32,15 +73,13 @@ const getCountFromPayload = (payload, keys = []) => {
   };
 
   for (const key of keys) {
-    const count = parseCount(payload[key]);
+    const count = parseCount(parsed[key]);
     if (count !== null) return count;
   }
 
-  if (payload.data && typeof payload.data === "object") {
-    for (const key of keys) {
-      const count = parseCount(payload.data[key]);
-      if (count !== null) return count;
-    }
+  for (const key of WRAPPER_KEYS) {
+    const nestedCount = getCountFromPayload(parsed[key], keys);
+    if (nestedCount !== null) return nestedCount;
   }
 
   return null;
@@ -48,9 +87,9 @@ const getCountFromPayload = (payload, keys = []) => {
 
 const resolveCount = (records, payload, keys = []) => {
   const payloadCount = getCountFromPayload(payload, keys);
-  if (records.length > 0 || payloadCount === null) return records.length;
+  if (records.length > 0) return records.length;
   if (payloadCount !== null) return payloadCount;
-  return records.length;
+  return 0;
 };
 
 function AdminDashboardPage() {
