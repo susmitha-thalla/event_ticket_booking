@@ -18,11 +18,146 @@ const ONE_SEAT_LIMIT_PATTERNS = [
   /one seat per booking/i,
   /book only one seat/i,
 ];
+const QR_IMAGE_EXTENSIONS = /\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i;
+const USER_BOOKING_ENDPOINT_CANDIDATES = [
+  "/bookings/my-bookings",
+  "/bookings/user-bookings",
+  "/bookings/me",
+  "/bookings/user",
+  "/users/bookings",
+];
+const ORGANIZER_BOOKING_ENDPOINT_CANDIDATES = [
+  "/bookings/organizer-bookings",
+  "/bookings/organizer/all",
+  "/organizer/bookings",
+];
+const ADMIN_BOOKING_ENDPOINT_CANDIDATES = [
+  "/bookings/all",
+  "/bookings/admin/all",
+  "/admin/bookings/all",
+  "/bookings",
+];
+const EVENT_LIST_ENDPOINT_CANDIDATES = [
+  "/events/all",
+  "/events/live",
+  "/events/upcoming",
+  "/events/admin/all",
+];
+const USER_BOOKINGS_CACHE_PREFIX = "ticket_booking_user_bookings_v2::";
+const ADMIN_BOOKINGS_CACHE_KEY = "ticket_booking_admin_bookings_v2";
 
 const normalizeString = (value) => String(value || "").trim();
+const parseMaybeJson = (value) => {
+  if (typeof value !== "string") return value;
+  const text = value.trim();
+  if (!text) return value;
+  const looksLikeJson =
+    (text.startsWith("{") && text.endsWith("}")) ||
+    (text.startsWith("[") && text.endsWith("]"));
+  if (!looksLikeJson) return value;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return value;
+  }
+};
 const toNumeric = (value, fallback = 0) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+};
+const hasBrowserStorage = () => typeof window !== "undefined" && Boolean(window.localStorage);
+const isAuthStatus = (status) => status === 401 || status === 403;
+
+const isLikelyBase64Image = (value) => {
+  const normalized = normalizeString(value).replace(/\s+/g, "");
+  if (normalized.length < 100) return false;
+  if (!/^[A-Za-z0-9+/=]+$/.test(normalized)) return false;
+
+  return (
+    normalized.startsWith("iVBOR") ||
+    normalized.startsWith("/9j/") ||
+    normalized.startsWith("R0lGOD") ||
+    normalized.startsWith("UklGR") ||
+    normalized.startsWith("PHN2Zy") ||
+    normalized.length % 4 === 0
+  );
+};
+
+const buildAbsoluteUrlFromApiBase = (pathValue) => {
+  const normalizedPath = normalizeString(pathValue).replace(/\\/g, "/");
+  if (!normalizedPath) return "";
+
+  const apiBase = normalizeString(import.meta.env.VITE_API_BASE_URL);
+  if (!apiBase) return normalizedPath;
+
+  try {
+    const apiUrl = new URL(apiBase);
+    const origin = `${apiUrl.protocol}//${apiUrl.host}`;
+
+    if (normalizedPath.startsWith("http://") || normalizedPath.startsWith("https://")) {
+      return normalizedPath;
+    }
+
+    if (normalizedPath.startsWith("/")) {
+      return `${origin}${normalizedPath}`;
+    }
+
+    return `${origin}/${normalizedPath.replace(/^\.?\//, "")}`;
+  } catch {
+    return normalizedPath;
+  }
+};
+
+const normalizeQrImagePath = (booking = {}) => {
+  const qrCandidates = [
+    booking.qrImagePath,
+    booking.qrImage,
+    booking.qrCodeImage,
+    booking.qrCode,
+    booking.qrCodePath,
+    booking.qrPath,
+    booking.qrTicket,
+    booking.qrTicketPath,
+    booking.ticketQrImage,
+  ];
+
+  const normalizedCandidates = qrCandidates.flatMap((candidate) => {
+    if (candidate && typeof candidate === "object") {
+      return [
+        candidate.url,
+        candidate.path,
+        candidate.src,
+        candidate.value,
+        candidate.data,
+        candidate.base64,
+      ];
+    }
+    return [candidate];
+  });
+
+  for (const candidate of normalizedCandidates) {
+    const value = normalizeString(candidate).replace(/^["']|["']$/g, "");
+    if (!value) continue;
+
+    if (value.startsWith("data:image")) return value;
+    if (value.startsWith("http://") || value.startsWith("https://")) return value;
+    if (isLikelyBase64Image(value)) return `data:image/png;base64,${value}`;
+
+    if (
+      value.startsWith("/") ||
+      value.startsWith("./") ||
+      value.startsWith("uploads/") ||
+      value.startsWith("images/") ||
+      value.startsWith("qrcode/") ||
+      value.startsWith("qr/") ||
+      value.startsWith("api/") ||
+      QR_IMAGE_EXTENSIONS.test(value)
+    ) {
+      return buildAbsoluteUrlFromApiBase(value);
+    }
+  }
+
+  return "";
 };
 
 const normalizeBookingStatus = (value) => {
@@ -71,53 +206,85 @@ const normalizeSeatNumbers = (booking = {}) => {
 };
 
 const extractArrayFromPayload = (payload, preferredKeys = [], depth = 0) => {
-  if (Array.isArray(payload)) return payload;
-  if (!payload || typeof payload !== "object" || depth > 4) return [];
+  const parsed = parseMaybeJson(payload);
+  if (Array.isArray(parsed)) return parsed;
+  if (!parsed || typeof parsed !== "object" || depth > 4) return [];
 
   const keysToCheck = [...preferredKeys, ...FALLBACK_ARRAY_KEYS];
   for (const key of keysToCheck) {
-    if (Array.isArray(payload[key])) return payload[key];
+    if (Array.isArray(parsed[key])) return parsed[key];
   }
 
   for (const key of FALLBACK_WRAPPER_KEYS) {
-    if (payload[key] !== undefined) {
-      const nestedArray = extractArrayFromPayload(payload[key], preferredKeys, depth + 1);
+    if (parsed[key] !== undefined) {
+      const nestedArray = extractArrayFromPayload(parsed[key], preferredKeys, depth + 1);
       if (nestedArray.length > 0) return nestedArray;
     }
+  }
+
+  const objectArrayValues = Object.values(parsed).filter(Array.isArray);
+  if (objectArrayValues.length > 0) {
+    return objectArrayValues.sort((a, b) => b.length - a.length)[0];
   }
 
   return [];
 };
 
 const extractObjectFromPayload = (payload, depth = 0) => {
-  if (Array.isArray(payload)) {
-    return payload[0] && typeof payload[0] === "object" ? payload[0] : {};
+  const parsed = parseMaybeJson(payload);
+  if (Array.isArray(parsed)) {
+    return parsed[0] && typeof parsed[0] === "object" ? parsed[0] : {};
   }
 
-  if (!payload || typeof payload !== "object" || depth > 4) {
+  if (!parsed || typeof parsed !== "object" || depth > 4) {
     return {};
   }
 
   const objectKeys = ["booking", "item", "record"];
   for (const key of objectKeys) {
-    if (payload[key] && typeof payload[key] === "object") {
-      return payload[key];
+    if (parsed[key] && typeof parsed[key] === "object") {
+      return parsed[key];
     }
   }
 
   for (const key of FALLBACK_WRAPPER_KEYS) {
-    if (payload[key] !== undefined) {
-      const nestedObject = extractObjectFromPayload(payload[key], depth + 1);
+    if (parsed[key] !== undefined) {
+      const nestedObject = extractObjectFromPayload(parsed[key], depth + 1);
       if (nestedObject && Object.keys(nestedObject).length > 0) {
         return nestedObject;
       }
     }
   }
 
-  return payload;
+  return parsed;
 };
 
 const getCurrentEmail = () => normalizeString(localStorage.getItem("email")).toLowerCase();
+const getUserBookingsCacheKey = () => {
+  const email = getCurrentEmail();
+  return email ? `${USER_BOOKINGS_CACHE_PREFIX}${email}` : "";
+};
+
+const readLocalStorageJson = (key, fallbackValue) => {
+  if (!hasBrowserStorage() || !key) return fallbackValue;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallbackValue;
+    const parsed = JSON.parse(raw);
+    return parsed ?? fallbackValue;
+  } catch {
+    return fallbackValue;
+  }
+};
+
+const writeLocalStorageJson = (key, value) => {
+  if (!hasBrowserStorage() || !key) return;
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // ignore storage quota or serialization errors
+  }
+};
 
 const normalizeBooking = (booking) => {
   if (!booking || typeof booking !== "object") return booking;
@@ -153,6 +320,7 @@ const normalizeBooking = (booking) => {
     seatNumbers: parsedSeatNumbers,
     quantity,
     totalAmount,
+    qrImagePath: normalizeQrImagePath(booking),
     user: userObject,
     event: eventObject,
   };
@@ -335,6 +503,12 @@ const isSingleSeatLimitError = (error) => {
 const mergeBookingsForSuccess = (bookings = [], fallbackSeatNumbers = []) => {
   const normalizedBookings = bookings.map((booking) => normalizeBooking(booking));
   const firstBooking = normalizedBookings[0] || {};
+  const qrImagePaths = [...new Set(
+    normalizedBookings
+      .map((booking) => normalizeString(booking?.qrImagePath))
+      .filter(Boolean)
+  )];
+  const primaryQrImagePath = qrImagePaths[0] || "";
 
   const seatFromBookings = normalizedBookings.flatMap((booking) =>
     splitSeatNumbers(booking?.seatNumbers)
@@ -386,7 +560,8 @@ const mergeBookingsForSuccess = (bookings = [], fallbackSeatNumbers = []) => {
     seatNumbers: resolvedSeats.length > 0 ? resolvedSeats.join(", ") : firstBooking.seatNumbers || "N/A",
     paymentStatus,
     bookingStatus,
-    qrImagePath: normalizedBookings.length === 1 ? firstBooking.qrImagePath : "",
+    qrImagePath: primaryQrImagePath,
+    qrImagePaths,
     individualBookings: normalizedBookings,
     isMultiBooking: normalizedBookings.length > 1,
   };

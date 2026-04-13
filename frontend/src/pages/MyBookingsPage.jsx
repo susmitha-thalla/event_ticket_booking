@@ -63,7 +63,7 @@ function MyBookingsPage() {
             const hasValidQr =
               booking.qrImagePath &&
               typeof booking.qrImagePath === "string" &&
-              booking.qrImagePath.startsWith("data:image");
+              booking.qrImagePath.trim().length > 0;
 
             return (
               <div className="booking-ticket-card" key={booking.bookingId || booking.id}>

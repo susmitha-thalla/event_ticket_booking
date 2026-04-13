@@ -11,6 +11,16 @@ function BookingSuccessPage() {
     ? booking.individualBookings
     : [];
   const isMultiBooking = Boolean(booking?.isMultiBooking) || individualBookings.length > 1;
+  const qrImageSources = [...new Set(
+    [
+      booking?.qrImagePath,
+      ...(Array.isArray(booking?.qrImagePaths) ? booking.qrImagePaths : []),
+      ...individualBookings.map((item) => item?.qrImagePath),
+    ]
+      .filter((value) => typeof value === "string")
+      .map((value) => value.trim())
+      .filter(Boolean)
+  )];
 
   if (!booking) {
     return (
@@ -47,12 +57,25 @@ function BookingSuccessPage() {
           <div className="qr-box">
             <p><strong>Your QR Ticket</strong></p>
 
-            {booking.qrImagePath && booking.qrImagePath.startsWith("data:image") ? (
-              <img
-                src={booking.qrImagePath}
-                alt="QR Ticket"
-                style={{ width: "220px", height: "220px", marginTop: "10px" }}
-              />
+            {qrImageSources.length > 0 ? (
+              <div
+                style={{
+                  marginTop: "10px",
+                  display: "flex",
+                  gap: "10px",
+                  flexWrap: "wrap",
+                  justifyContent: "center",
+                }}
+              >
+                {qrImageSources.map((qrSource, index) => (
+                  <img
+                    key={`${qrSource}-${index}`}
+                    src={qrSource}
+                    alt={`QR Ticket ${index + 1}`}
+                    style={{ width: "220px", height: "220px" }}
+                  />
+                ))}
+              </div>
             ) : (
               <p>QR image not available.</p>
             )}
