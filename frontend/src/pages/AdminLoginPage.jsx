@@ -3,55 +3,77 @@ import { useNavigate } from "react-router-dom";
 import { loginUser } from "../services/authService";
 import Navbar from "../components/Navbar";
 
-const EMAIL_REGEX = /^[a-z0-9]+@[a-z0-9.-]+\.[a-z]{2,}$/;
-
 function AdminLoginPage() {
-  const [form, setForm] = useState({ email: "", password: "" });
+  const [form, setForm] = useState({
+    email: "",
+    password: "",
+    role: "ADMIN",
+  });
   const [errorMsg, setErrorMsg] = useState("");
+  const [loading, setLoading] = useState(false);
+
   const navigate = useNavigate();
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    const nextValue =
-      name === "email" ? value.toLowerCase().replace(/\s+/g, "") : value;
-
     setErrorMsg("");
-    setForm({ ...form, [name]: nextValue });
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const clearSession = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("role");
+    localStorage.removeItem("email");
+    localStorage.removeItem("userId");
+    localStorage.removeItem("userCode");
+    localStorage.removeItem("accountStatus");
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const normalizedEmail = form.email.toLowerCase().trim();
-
-    if (!EMAIL_REGEX.test(normalizedEmail)) {
-      setErrorMsg("Use a valid lowercase email address.");
-      return;
-    }
+    setErrorMsg("");
+    setLoading(true);
 
     try {
-      const response = await loginUser({
-        ...form,
-        email: normalizedEmail,
-        role: "ADMIN",
-      });
-      const token = response?.token || response?.accessToken || response?.jwt;
-      if (!token) {
-        setErrorMsg("Login response is missing token. Please try again.");
+      const response = await loginUser(form);
+
+      if (!response?.token) {
+        throw new Error("Token not received from server");
+      }
+
+      const role = response.role?.toUpperCase();
+
+      if (role !== "ADMIN" && role !== "ROLE_ADMIN") {
+        clearSession();
+        setErrorMsg("This account is not an admin account.");
+        setLoading(false);
         return;
       }
 
-      localStorage.setItem("token", token);
-      localStorage.setItem("role", response?.role || "");
-      localStorage.setItem("email", response?.email || "");
-
-      if (response.role === "ADMIN" || response.role === "ROLE_ADMIN") {
-        navigate("/admin/dashboard");
-      } else {
-        setErrorMsg("This account is not an admin account.");
+      if (response.accountStatus && response.accountStatus.toUpperCase() !== "ACTIVE") {
+        clearSession();
+        setErrorMsg("Your account is not active.");
+        setLoading(false);
+        return;
       }
+
+      localStorage.setItem("token", response.token);
+      localStorage.setItem("role", response.role || "ADMIN");
+      localStorage.setItem("email", response.email || "");
+      localStorage.setItem("userId", response.userId ?? "");
+      localStorage.setItem("userCode", response.userCode ?? "");
+      localStorage.setItem("accountStatus", response.accountStatus ?? "ACTIVE");
+
+      navigate("/admin/dashboard");
     } catch (error) {
-      console.error(error);
-      setErrorMsg(error.response?.data || error.message || "Admin login failed");
+      console.error("Admin login failed:", error);
+      setErrorMsg(
+        error.response?.data?.message ||
+          error.response?.data ||
+          error.message ||
+          "Admin login failed"
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -72,8 +94,6 @@ function AdminLoginPage() {
               placeholder="Email"
               value={form.email}
               onChange={handleChange}
-              pattern="[a-z0-9]+@[a-z0-9.-]+\.[a-z]{2,}"
-              title="Use lowercase letters and numbers before @ (example: user123@mail.com)."
               required
             />
             <input
@@ -84,7 +104,9 @@ function AdminLoginPage() {
               onChange={handleChange}
               required
             />
-            <button type="submit">Login</button>
+            <button type="submit" disabled={loading}>
+              {loading ? "Logging in..." : "Login"}
+            </button>
           </form>
         </div>
       </div>
