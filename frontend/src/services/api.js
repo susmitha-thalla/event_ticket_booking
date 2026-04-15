@@ -4,63 +4,66 @@ const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
 });
 
-const getStoredToken = () => {
-  const raw =
-    localStorage.getItem("token") ||
-    localStorage.getItem("accessToken") ||
-    localStorage.getItem("jwt") ||
-    "";
+// =========================
+// REQUEST INTERCEPTOR
+// =========================
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token");
 
-  const cleaned = raw.trim();
-  if (!cleaned || cleaned === "undefined" || cleaned === "null") {
-    return "";
-  }
+    const publicUrls = [
+      "/users/register",
+      "/users/login",
 
-  const withoutBearer = cleaned.toLowerCase().startsWith("bearer ")
-    ? cleaned.slice(7).trim()
-    : cleaned;
+      "/events/all",
+      "/events/live",
+      "/events/upcoming",
+      "/events/completed",
+      "/events/starting-soon",
+      "/events/seat-based",
+      "/events/non-seat-based",
+      "/events/filter",
+      "/events/date",
+      "/events/category/",
+      "/events/location/",
+      "/events/",
 
-  return withoutBearer.replace(/^["']|["']$/g, "").trim();
-};
+      "/seats/event/"
+    ];
 
-api.interceptors.request.use((config) => {
-  const token = getStoredToken();
+    const url = config.url || "";
 
-  const publicUrls = [
-    "/users/register",
-    "/users/login",
-    "/events/all",
-    "/events/category/",
-    "/events/location/",
-    "/events/filter",
-    "/events/date",
-  ];
+    const isPublic = publicUrls.some((publicUrl) => url.includes(publicUrl));
 
-  const isPublic = publicUrls.some((url) => config.url?.includes(url));
+    if (token && !isPublic) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
 
-  if (token && !isPublic) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
-  return config;
-});
-
+// =========================
+// RESPONSE INTERCEPTOR
+// =========================
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error?.response?.status;
-    const looksLikeAuthError =
-      status === 401 ||
-      /status code 401/i.test(error?.message || "");
 
-    if (looksLikeAuthError) {
-      const existingToken = getStoredToken();
-      if (existingToken) {
-        localStorage.removeItem("token");
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("jwt");
-      }
+    // logout only for invalid/expired token
+    if (status === 401) {
+      console.error("Unauthorized - token invalid or expired. Logging out.");
+
+      localStorage.removeItem("token");
+      localStorage.removeItem("role");
+      localStorage.removeItem("email");
+
+      window.location.href = "/user/login";
     }
+
+    // keep 403 for page-level handling
     return Promise.reject(error);
   }
 );

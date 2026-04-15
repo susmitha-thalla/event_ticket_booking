@@ -1,232 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import Navbar from "../components/Navbar";
-import { Link, useNavigate } from "react-router-dom";
-import { getAllUsers } from "../services/adminService";
-import { getAdminAllEvents } from "../services/eventService";
-import { getAllBookings } from "../services/bookingService";
-
-const WRAPPER_KEYS = ["data", "payload", "result", "response", "body", "value"];
-const FALLBACK_ARRAY_KEYS = ["users", "events", "bookings", "content", "items", "results", "list", "records", "rows"];
-
-const parseMaybeJson = (value) => {
-  if (typeof value !== "string") return value;
-  const text = value.trim();
-  if (!text) return value;
-  const looksLikeJson = (text.startsWith("{") && text.endsWith("}")) || (text.startsWith("[") && text.endsWith("]"));
-  if (!looksLikeJson) return value;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return value;
-  }
-};
-
-const unwrapPayload = (payload, depth = 0) => {
-  const parsed = parseMaybeJson(payload);
-  if (depth > 5) return parsed;
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return parsed;
-
-  for (const key of WRAPPER_KEYS) {
-    if (parsed[key] !== undefined) {
-      const nested = unwrapPayload(parsed[key], depth + 1);
-      if (nested !== undefined && nested !== null) {
-        return nested;
-      }
-    }
-  }
-
-  return parsed;
-};
-
-const getArrayFromPayload = (payload, keys = [], depth = 0) => {
-  const parsed = parseMaybeJson(payload);
-  if (Array.isArray(parsed)) return parsed;
-  if (!parsed || typeof parsed !== "object" || depth > 5) return [];
-
-  const keysToCheck = [...keys, ...FALLBACK_ARRAY_KEYS];
-  for (const key of keysToCheck) {
-    if (Array.isArray(parsed[key])) return parsed[key];
-  }
-
-  for (const key of WRAPPER_KEYS) {
-    if (parsed[key] !== undefined) {
-      const nestedArray = getArrayFromPayload(parsed[key], keys, depth + 1);
-      if (nestedArray.length > 0) return nestedArray;
-    }
-  }
-
-  const objectArrayValues = Object.values(parsed).filter(Array.isArray);
-  if (objectArrayValues.length > 0) {
-    return objectArrayValues.sort((a, b) => b.length - a.length)[0];
-  }
-
-  return [];
-};
-
-const getCountFromPayload = (payload, keys = []) => {
-  const parsed = unwrapPayload(payload);
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
-
-  const parseCount = (value) => {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  };
-
-  for (const key of keys) {
-    const count = parseCount(parsed[key]);
-    if (count !== null) return count;
-  }
-
-  for (const key of WRAPPER_KEYS) {
-    const nestedCount = getCountFromPayload(parsed[key], keys);
-    if (nestedCount !== null) return nestedCount;
-  }
-
-  return null;
-};
-
-const resolveCount = (records, payload, keys = []) => {
-  const payloadCount = getCountFromPayload(payload, keys);
-  if (records.length > 0) return records.length;
-  if (payloadCount !== null) return payloadCount;
-  return 0;
-};
-
-const dedupeByKey = (records = [], resolver) => {
-  const unique = new Map();
-  for (const item of records || []) {
-    if (!item || typeof item !== "object") continue;
-    const rawKey = resolver(item);
-    const key = rawKey === null || rawKey === undefined ? JSON.stringify(item) : String(rawKey);
-    if (!unique.has(key)) unique.set(key, item);
-  }
-  return Array.from(unique.values());
-};
 
 function AdminDashboardPage() {
-  const [stats, setStats] = useState({
-    users: 0,
-    events: 0,
-    approvedEvents: 0,
-    upcomingEvents: 0,
-    completedEvents: 0,
-    bookings: 0,
-    pendingEvents: 0,
-    liveEvents: 0,
-    cancelledBookings: 0,
-    cancelledEvents: 0,
-  });
-  const [errorMessage, setErrorMessage] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
-    const loadStats = async () => {
-      const [usersResult, eventsResult, bookingsResult] = await Promise.allSettled([
-        getAllUsers(),
-        getAdminAllEvents(),
-        getAllBookings(),
-      ]);
+    const role = localStorage.getItem("role");
 
-      const results = [usersResult, eventsResult, bookingsResult];
-      const fulfilledCount = results.filter((result) => result.status === "fulfilled").length;
-      const authFailureCount = results.filter(
-        (result) =>
-          result.status === "rejected" &&
-          (result.reason?.response?.status === 401 || result.reason?.response?.status === 403)
-      ).length;
-
-      if (fulfilledCount === 0 && authFailureCount > 0) {
-        navigate("/admin/login");
-        return;
-      }
-
-      const usersPayload = usersResult.status === "fulfilled" ? usersResult.value : [];
-      const eventsPayload = eventsResult.status === "fulfilled" ? eventsResult.value : [];
-      const bookingsPayload = bookingsResult.status === "fulfilled" ? bookingsResult.value : [];
-
-      const users = getArrayFromPayload(usersPayload, ["users", "content", "items", "results"]);
-      const events = getArrayFromPayload(eventsPayload, ["events", "content", "items", "results"]);
-      const bookings = getArrayFromPayload(bookingsPayload, ["bookings", "content", "items", "results"]);
-      const uniqueUsers = dedupeByKey(users, (user) => user?.userId ?? user?.id ?? user?.email);
-      const uniqueEvents = dedupeByKey(events, (event) => event?.eventId ?? event?.id);
-      const uniqueBookings = dedupeByKey(
-        bookings,
-        (booking) => booking?.bookingId ?? booking?.id ?? booking?.bookingCode
-      );
-
-      const deletedOrCancelledEvents = (uniqueEvents || []).filter((event) => {
-        const status = String(event?.eventStatus || "").toUpperCase();
-        return (
-          event?.isDeleted ||
-          status === "DELETED" ||
-          status === "CANCELLED" ||
-          status === "CANCELED"
-        );
-      });
-
-      const visibleEvents = (uniqueEvents || []).filter(
-        (event) => !deletedOrCancelledEvents.some((removedEvent) => removedEvent?.eventId === event?.eventId)
-      );
-
-      const now = Date.now();
-      const isCompleted = (event) => {
-        const status = String(event?.eventStatus || "").toUpperCase();
-        if (status === "COMPLETED" || status === "ENDED") return true;
-
-        const eventDate = new Date(event?.eventDate);
-        if (Number.isNaN(eventDate.getTime())) return false;
-        return eventDate.getTime() < now;
-      };
-
-      const pendingEvents = visibleEvents.filter((event) => String(event?.approvalStatus || "").toUpperCase() !== "APPROVED").length;
-      const approvedEvents = visibleEvents.filter((event) => String(event?.approvalStatus || "").toUpperCase() === "APPROVED").length;
-      const liveEvents = visibleEvents.filter((event) => String(event?.eventStatus || "").toUpperCase() === "LIVE").length;
-      const completedEvents = visibleEvents.filter((event) => isCompleted(event)).length;
-      const upcomingEvents = visibleEvents.filter((event) => !isCompleted(event)).length;
-      const cancelledBookings = uniqueBookings.filter((booking) => {
-        const status = String(booking?.bookingStatus || booking?.status || "").toUpperCase();
-        return status === "CANCELLED" || status === "CANCELED";
-      }).length;
-
-      const failedSegments = [];
-      if (usersResult.status === "rejected") failedSegments.push("users");
-      if (eventsResult.status === "rejected") failedSegments.push("events");
-      if (bookingsResult.status === "rejected") failedSegments.push("bookings");
-      const hasOnlyBookingsFailure =
-        failedSegments.length === 1 && failedSegments[0] === "bookings";
-
-      setErrorMessage(
-        failedSegments.length > 0 && !hasOnlyBookingsFailure
-          ? `Some dashboard data could not be refreshed (${failedSegments.join(", ")}). Showing available values.`
-          : ""
-      );
-
-      setStats({
-        users: resolveCount(uniqueUsers, usersPayload, ["totalUsers", "usersCount", "count", "total", "totalElements"]),
-        events: resolveCount(uniqueEvents, eventsPayload, ["totalEvents", "eventsCount", "count", "total", "totalElements"]),
-        approvedEvents: approvedEvents || getCountFromPayload(eventsPayload, ["approvedEvents", "approvedCount"]) || 0,
-        upcomingEvents: upcomingEvents || getCountFromPayload(eventsPayload, ["upcomingEvents", "upcomingCount"]) || 0,
-        completedEvents: completedEvents || getCountFromPayload(eventsPayload, ["completedEvents", "completedCount"]) || 0,
-        bookings: resolveCount(uniqueBookings, bookingsPayload, ["totalBookings", "bookingsCount", "count", "total", "totalElements"]),
-        pendingEvents: pendingEvents || getCountFromPayload(eventsPayload, ["pendingEvents", "pendingCount"]) || 0,
-        liveEvents: liveEvents || getCountFromPayload(eventsPayload, ["liveEvents", "liveCount"]) || 0,
-        cancelledBookings: cancelledBookings || getCountFromPayload(bookingsPayload, ["cancelledBookings", "cancelledCount"]) || 0,
-        cancelledEvents:
-          deletedOrCancelledEvents.length ||
-          getCountFromPayload(eventsPayload, ["cancelledEvents", "cancelledCount", "deletedEvents", "deletedCount"]) ||
-          0,
-      });
-    };
-
-    loadStats();
-    const refreshId = window.setInterval(loadStats, 15000);
-    const onFocus = () => loadStats();
-    window.addEventListener("focus", onFocus);
-
-    return () => {
-      window.clearInterval(refreshId);
-      window.removeEventListener("focus", onFocus);
-    };
+    if (!role || (role !== "ADMIN" && role !== "ROLE_ADMIN")) {
+      alert("Access denied. Admin only.");
+      navigate("/login");
+    }
   }, [navigate]);
 
   return (
@@ -235,47 +20,66 @@ function AdminDashboardPage() {
       <div className="container">
         <div className="page-header">
           <h1 className="page-title">Admin Dashboard</h1>
-          <p className="page-subtitle">Monitor users, approve events, and control bookings.</p>
+          <p className="page-subtitle">
+            Monitor users, approve events, manage bookings, and control the platform.
+          </p>
         </div>
-        {errorMessage && <div className="message-error">{errorMessage}</div>}
 
         <div className="grid-3">
+          
+          {/* USERS */}
           <div className="stat-box">
-            <div className="stat-value">{stats.users}</div>
+            <div className="stat-value">Users</div>
             <div className="stat-label">View all registered users</div>
             <div style={{ marginTop: "14px" }}>
               <Link to="/admin/users">Open</Link>
             </div>
           </div>
 
+          {/* EVENTS */}
           <div className="stat-box">
-            <div className="stat-value">{stats.events}</div>
-            <div className="stat-label">
-              Approve and manage all events
-              <br />
-              Approved: {stats.approvedEvents} | Pending: {stats.pendingEvents}
-              <br />
-              Live: {stats.liveEvents}
-              <br />
-              Upcoming: {stats.upcomingEvents} | Completed: {stats.completedEvents}
-              <br />
-              Cancelled/Deleted: {stats.cancelledEvents}
-            </div>
+            <div className="stat-value">Events</div>
+            <div className="stat-label">Approve / Reject / Delete events</div>
             <div style={{ marginTop: "14px" }}>
               <Link to="/admin/events">Open</Link>
             </div>
           </div>
 
+          {/* BOOKINGS */}
           <div className="stat-box">
-            <div className="stat-value">{stats.bookings}</div>
-            <div className="stat-label">
-              Review all user bookings
-              <br />
-              Cancelled: {stats.cancelledBookings}
-            </div>
+            <div className="stat-value">Bookings</div>
+            <div className="stat-label">Review all user bookings</div>
             <div style={{ marginTop: "14px" }}>
               <Link to="/admin/bookings">Open</Link>
             </div>
+          </div>
+
+        </div>
+
+        {/* NEW QUICK ACTIONS */}
+        <div style={{ marginTop: "30px" }}>
+          <h3>Quick Actions</h3>
+
+          <div className="grid-3">
+
+            <div className="card">
+              <h4>Pending Events</h4>
+              <p>Approve or reject events waiting for review.</p>
+              <Link to="/admin/events?filter=pending">View</Link>
+            </div>
+
+            <div className="card">
+              <h4>All Events</h4>
+              <p>See all events including live and upcoming.</p>
+              <Link to="/admin/events">View</Link>
+            </div>
+
+            <div className="card">
+              <h4>All Bookings</h4>
+              <p>Track bookings and transactions.</p>
+              <Link to="/admin/bookings">View</Link>
+            </div>
+
           </div>
         </div>
       </div>

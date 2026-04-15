@@ -1,78 +1,28 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
-import { cancelEvent, getMyEvents, updateEvent } from "../services/eventService";
-import { uploadEventWallpaper } from "../services/uploadService";
-
-const formatDateTime = (value) => {
-  if (!value) return "N/A";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleString();
-};
-
-const toDateTimeLocal = (value) => {
-  if (!value) return "";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "";
-
-  const timezoneOffsetMs = parsed.getTimezoneOffset() * 60 * 1000;
-  const localDate = new Date(parsed.getTime() - timezoneOffsetMs);
-  return localDate.toISOString().slice(0, 16);
-};
-
-const normalizeStatus = (value) => String(value || "").trim().toUpperCase();
-const toNumeric = (value, fallback = 0) => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-};
-const isSeatsCompleted = (event) => toNumeric(event?.availableSeats, 0) <= 0;
-const isEventCancelled = (event) => {
-  const status = normalizeStatus(event?.eventStatus || event?.status);
-  return (
-    Boolean(event?.isDeleted) ||
-    status === "CANCELLED" ||
-    status === "CANCELED" ||
-    status === "DELETED"
-  );
-};
+import {
+  deleteEvent,
+  getMyEvents,
+} from "../services/eventService";
 
 function MyEventsPage() {
   const [events, setEvents] = useState([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [activeEditId, setActiveEditId] = useState(null);
-  const [wallpaperFile, setWallpaperFile] = useState(null);
-  const [wallpaperPreview, setWallpaperPreview] = useState("");
-  const [editForm, setEditForm] = useState({
-    location: "",
-    eventDate: "",
-    availableSeats: "",
-    wallpaperUrl: "",
-  });
-  const [infoMessage, setInfoMessage] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
-  const [searchParams, setSearchParams] = useSearchParams();
-  const canUploadWallpapers = import.meta.env.VITE_ENABLE_WALLPAPER_UPLOAD !== "false";
+  const [filter, setFilter] = useState("ALL");
+  const [loading, setLoading] = useState(true);
 
-  const isEventCompleted = (event) => {
-    if (!event) return false;
-    const status = normalizeStatus(event.eventStatus || event.status);
-    if (status === "COMPLETED" || status === "ENDED") return true;
-    if (isSeatsCompleted(event)) return true;
-    if (!event.eventDate) return false;
-    const eventDate = new Date(event.eventDate);
-    if (Number.isNaN(eventDate.getTime())) return false;
-    return eventDate.getTime() < Date.now();
-  };
+  const navigate = useNavigate();
 
   const loadEvents = async () => {
     try {
-      setErrorMessage("");
+      setLoading(true);
       const data = await getMyEvents();
-      setEvents(data || []);
+      setEvents(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error(error);
-      setErrorMessage("Failed to load organizer events.");
+      alert("Failed to load my events");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -80,362 +30,177 @@ function MyEventsPage() {
     loadEvents();
   }, []);
 
-  const handleCancelEvent = async (eventId) => {
-    const allowCancel = window.confirm(
-      "Cancel this event? Users will no longer be able to book it."
+  const filteredEvents = useMemo(() => {
+    if (filter === "ALL") return events;
+    return events.filter(
+      (event) =>
+        (event.approvalStatus || "").toUpperCase() === filter.toUpperCase()
     );
-    if (!allowCancel) return;
+  }, [events, filter]);
+
+  const handleDelete = async (eventId) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this event?"
+    );
+    if (!confirmed) return;
 
     try {
-      setSubmitting(true);
-      setErrorMessage("");
-      setInfoMessage("");
-      await cancelEvent(eventId);
-      setEvents((previous) =>
-        previous.map((event) =>
-          event.eventId === eventId
-            ? {
-                ...event,
-                isDeleted: true,
-                eventStatus: "CANCELLED",
-                status: "CANCELLED",
-                approvalStatus: event.approvalStatus || "APPROVED",
-              }
-            : event
-        )
+      const response = await deleteEvent(eventId);
+      alert(
+        typeof response === "string"
+          ? response
+          : "Event deleted successfully"
       );
-      setInfoMessage("Event cancelled successfully.");
+      await loadEvents();
     } catch (error) {
       console.error(error);
-      setErrorMessage(error?.response?.data || "Unable to cancel event right now.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const startEditing = (event) => {
-    setErrorMessage("");
-    setInfoMessage("");
-    setActiveEditId(event.eventId);
-    setWallpaperFile(null);
-    setWallpaperPreview("");
-    setEditForm({
-      location: event.location || "",
-      eventDate: toDateTimeLocal(event.eventDate),
-      availableSeats: String(toNumeric(event.availableSeats, 0)),
-      wallpaperUrl: event.wallpaperUrl || "",
-    });
-  };
-
-  const resetEditState = () => {
-    setActiveEditId(null);
-    setWallpaperFile(null);
-    setWallpaperPreview("");
-    setEditForm({
-      location: "",
-      eventDate: "",
-      availableSeats: "",
-      wallpaperUrl: "",
-    });
-  };
-
-  const handleEditFormChange = (e) => {
-    const { name, value } = e.target;
-    setEditForm((previous) => ({
-      ...previous,
-      [name]: value,
-    }));
-  };
-
-  const handleUpdateEvent = async (eventId) => {
-    const seatsValue = Number(editForm.availableSeats);
-    if (!Number.isFinite(seatsValue) || seatsValue < 0) {
-      setErrorMessage("Available seats should be 0 or more.");
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-      setErrorMessage("");
-      setInfoMessage("");
-
-      let finalWallpaperUrl = editForm.wallpaperUrl.trim();
-      if (wallpaperFile && canUploadWallpapers) {
-        const uploaded = await uploadEventWallpaper(wallpaperFile);
-        finalWallpaperUrl = uploaded?.url || finalWallpaperUrl;
-      }
-
-      const payload = {
-        location: editForm.location.trim(),
-        eventDate: editForm.eventDate,
-        availableSeats: seatsValue,
-        wallpaperUrl: finalWallpaperUrl,
-      };
-      const updatedEvent = await updateEvent(eventId, payload);
-
-      setEvents((previous) =>
-        previous.map((event) =>
-          event.eventId === eventId
-            ? {
-                ...event,
-                ...payload,
-                ...updatedEvent,
-                availableSeats: seatsValue,
-                eventDate: editForm.eventDate,
-                wallpaperUrl: finalWallpaperUrl || event.wallpaperUrl,
-              }
-            : event
-        )
+      alert(
+        error.response?.data?.message ||
+          error.response?.data ||
+          error.message ||
+          "Failed to delete event"
       );
-
-      setInfoMessage("Event updated successfully.");
-      resetEditState();
-    } catch (error) {
-      console.error(error);
-      const backendMessage =
-        error?.response?.data?.message ||
-        (typeof error?.response?.data === "string" ? error?.response?.data : "");
-      setErrorMessage(backendMessage || "Unable to update event right now.");
-    } finally {
-      setSubmitting(false);
     }
   };
 
-  const upcomingEvents = events.filter((event) => !isEventCancelled(event) && !isEventCompleted(event));
-  const completedEvents = events.filter(
-    (event) => !isEventCancelled(event) && isEventCompleted(event)
-  );
-  const cancelledEvents = events.filter((event) => isEventCancelled(event));
-  const activeTab = useMemo(() => {
-    const tab = searchParams.get("tab") || "upcoming";
-    if (tab === "deleted") return "cancelled";
-    return tab;
-  }, [searchParams]);
-
-  const setTab = (tab) => {
-    setSearchParams({ tab });
+  const handleManageSeats = (eventId) => {
+    navigate(`/organizer/events/${eventId}/seats`);
   };
 
-  const getStatusBadgeClass = (event) => {
-    if (isEventCancelled(event)) return "badge rejected";
-    if (isSeatsCompleted(event)) return "badge pending";
-    return "badge approved";
+  const handleEditEvent = (eventId) => {
+    navigate(`/organizer/events/edit/${eventId}`);
   };
 
-  const getStatusLabel = (event) => {
-    if (isEventCancelled(event)) return "CANCELLED";
-    if (isSeatsCompleted(event)) return "SOLD OUT";
-    if (isEventCompleted(event)) return "COMPLETED";
-    return normalizeStatus(event?.eventStatus) || "UPCOMING";
+  const formatDateTime = (value) => {
+    if (!value) return "N/A";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleString();
   };
 
-  const renderEventCard = (event, options = {}) => (
-    <div className="card" key={event.eventId}>
-      {event.wallpaperUrl ? (
-        <img
-          src={event.wallpaperUrl}
-          alt={`${event.title} wallpaper`}
-          style={{
-            width: "100%",
-            height: "180px",
-            objectFit: "cover",
-            borderRadius: "12px",
-            marginBottom: "12px",
-          }}
-        />
-      ) : null}
-      <h3>{event.title}</h3>
-      <p className="subtext">{event.description}</p>
-      <p><strong>Location:</strong> {event.location}</p>
-      <p><strong>Category:</strong> {event.category}</p>
-      <p><strong>Date:</strong> {formatDateTime(event.eventDate)}</p>
-      <p><strong>Price:</strong> ₹{event.price}</p>
-      <p><strong>Seats:</strong> {event.availableSeats}</p>
-      {isSeatsCompleted(event) && !isEventCancelled(event) && (
-        <p><strong>Seat Status:</strong> SOLD OUT</p>
-      )}
-      <p><strong>Status:</strong> {getStatusLabel(event)}</p>
+  const getApprovalBadgeClass = (status) => {
+    const normalized = (status || "").toUpperCase();
+    if (normalized === "APPROVED") return "approved";
+    if (normalized === "REJECTED") return "rejected";
+    return "pending";
+  };
 
-      <span
-        className={`badge ${
-          event.approvalStatus === "APPROVED" ? "approved" : "pending"
-        }`}
-      >
-        {event.approvalStatus}
-      </span>
-      <span className={getStatusBadgeClass(event)} style={{ marginLeft: "8px" }}>
-        {getStatusLabel(event)}
-      </span>
-
-      {!options.isCancelledList && (
-        <div style={{ marginTop: "10px" }}>
-          <button
-            type="button"
-            className="secondary"
-            onClick={() => startEditing(event)}
-            disabled={submitting}
-            style={{ marginRight: "8px" }}
-          >
-            Edit Event
-          </button>
-          <button
-            className="danger"
-            onClick={() => handleCancelEvent(event.eventId)}
-            disabled={submitting}
-          >
-            Cancel Event
-          </button>
-        </div>
-      )}
-
-      {activeEditId === event.eventId && (
-        <div className="card" style={{ marginTop: "14px", background: "#f8fbff" }}>
-          <h3 style={{ marginBottom: "8px" }}>Update Event Details</h3>
-          <input
-            name="location"
-            placeholder="Location"
-            value={editForm.location}
-            onChange={handleEditFormChange}
-          />
-          <input
-            type="datetime-local"
-            name="eventDate"
-            value={editForm.eventDate}
-            onChange={handleEditFormChange}
-          />
-          <input
-            type="number"
-            min="0"
-            step="1"
-            name="availableSeats"
-            placeholder="Available Seats"
-            value={editForm.availableSeats}
-            onChange={handleEditFormChange}
-          />
-          <input
-            type="url"
-            name="wallpaperUrl"
-            placeholder="Wallpaper URL"
-            value={editForm.wallpaperUrl}
-            onChange={handleEditFormChange}
-          />
-          <input
-            type="file"
-            accept="image/png,image/jpeg,image/jpg,image/webp"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              setWallpaperFile(file || null);
-              if (file) {
-                setWallpaperPreview(URL.createObjectURL(file));
-              } else {
-                setWallpaperPreview("");
-              }
-            }}
-          />
-          {!canUploadWallpapers && (
-            <div className="subtext" style={{ marginBottom: "0" }}>
-              Wallpaper upload is disabled for this deployment. Use Wallpaper URL.
-            </div>
-          )}
-          {(wallpaperPreview || editForm.wallpaperUrl) && (
-            <img
-              src={wallpaperPreview || editForm.wallpaperUrl}
-              alt="Wallpaper preview"
-              style={{
-                width: "100%",
-                height: "160px",
-                objectFit: "cover",
-                borderRadius: "12px",
-                marginTop: "10px",
-              }}
-              onError={(e) => {
-                e.currentTarget.style.display = "none";
-              }}
-            />
-          )}
-
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "10px" }}>
-            <button type="button" onClick={() => handleUpdateEvent(event.eventId)} disabled={submitting}>
-              Save Changes
-            </button>
-            <button type="button" className="secondary" onClick={resetEditState} disabled={submitting}>
-              Close
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  const getEventStatusBadgeClass = (status) => {
+    const normalized = (status || "").toUpperCase();
+    if (normalized === "LIVE") return "live";
+    if (normalized === "COMPLETED") return "completed";
+    if (normalized === "DELETED") return "deleted";
+    return "upcoming";
+  };
 
   return (
     <>
       <Navbar />
       <div className="container">
-        <h2>My Events</h2>
-        {infoMessage && <div className="message-success">{infoMessage}</div>}
-        {errorMessage && <div className="message-error">{errorMessage}</div>}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: "1rem",
+            flexWrap: "wrap",
+            marginBottom: "1rem",
+          }}
+        >
+          <h2>My Events</h2>
 
-        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "16px" }}>
-          <button
-            type="button"
-            className={activeTab === "upcoming" ? "" : "secondary"}
-            onClick={() => setTab("upcoming")}
-          >
-            Upcoming ({upcomingEvents.length})
-          </button>
-          <button
-            type="button"
-            className={activeTab === "completed" ? "" : "secondary"}
-            onClick={() => setTab("completed")}
-          >
-            Completed ({completedEvents.length})
-          </button>
-          <button
-            type="button"
-            className={activeTab === "cancelled" ? "danger" : "secondary"}
-            onClick={() => setTab("cancelled")}
-          >
-            Cancelled ({cancelledEvents.length})
-          </button>
+          <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+            <label htmlFor="approvalFilter"><strong>Filter:</strong></label>
+            <select
+              id="approvalFilter"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+            >
+              <option value="ALL">All</option>
+              <option value="APPROVED">Approved</option>
+              <option value="PENDING">Pending</option>
+              <option value="REJECTED">Rejected</option>
+            </select>
+          </div>
         </div>
 
-        {activeTab === "upcoming" && (
-          <>
-            <h3>Upcoming Events ({upcomingEvents.length})</h3>
-            {upcomingEvents.length === 0 ? (
-              <div className="card empty-state">
-                <p>No upcoming events.</p>
-              </div>
-            ) : (
-              upcomingEvents.map((event) => renderEventCard(event))
-            )}
-          </>
-        )}
+        {loading ? (
+          <p>Loading events...</p>
+        ) : filteredEvents.length === 0 ? (
+          <p>No events found.</p>
+        ) : (
+          filteredEvents.map((event) => (
+            <div className="card" key={event.eventId} style={{ marginBottom: "1rem" }}>
+              {event.seatMapImageUrl && (
+                <img
+                  src={event.seatMapImageUrl}
+                  alt={event.title}
+                  style={{
+                    width: "100%",
+                    maxHeight: "260px",
+                    objectFit: "cover",
+                    borderRadius: "12px",
+                    marginBottom: "1rem",
+                  }}
+                  onError={(e) => {
+                    e.target.style.display = "none";
+                  }}
+                />
+              )}
 
-        {activeTab === "completed" && (
-          <>
-            <h3>Completed Events ({completedEvents.length})</h3>
-            {completedEvents.length === 0 ? (
-              <div className="card empty-state">
-                <p>No completed events.</p>
-              </div>
-            ) : (
-              completedEvents.map((event) => renderEventCard(event))
-            )}
-          </>
-        )}
+              <h3>{event.title}</h3>
+              <p className="subtext">{event.description}</p>
 
-        {activeTab === "cancelled" && (
-          <>
-            <h3>Cancelled Events ({cancelledEvents.length})</h3>
-            {cancelledEvents.length === 0 ? (
-              <div className="card empty-state">
-                <p>No cancelled events.</p>
+              <p><strong>Location:</strong> {event.location || "N/A"}</p>
+              <p><strong>City:</strong> {event.city || "N/A"}</p>
+              <p><strong>Address:</strong> {event.address || "N/A"}</p>
+              <p><strong>Category:</strong> {event.category || "N/A"}</p>
+              <p><strong>Venue Type:</strong> {event.venueType || "N/A"}</p>
+              <p><strong>Start Time:</strong> {formatDateTime(event.startTime || event.eventDate)}</p>
+              <p><strong>End Time:</strong> {formatDateTime(event.endTime)}</p>
+              <p><strong>Price:</strong> ₹{event.price ?? 0}</p>
+              <p><strong>Seat Based:</strong> {event.hasSeats ? "Yes" : "No"}</p>
+              <p><strong>Available Seats:</strong> {event.availableSeats ?? "N/A"}</p>
+              <p><strong>Total Seats:</strong> {event.totalSeats ?? "N/A"}</p>
+              <p><strong>Event Code:</strong> {event.eventCode || "N/A"}</p>
+
+              <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", marginTop: "0.75rem" }}>
+                <span className={`badge ${getApprovalBadgeClass(event.approvalStatus)}`}>
+                  {event.approvalStatus || "PENDING"}
+                </span>
+
+                <span className={`badge ${getEventStatusBadgeClass(event.eventStatus)}`}>
+                  {event.eventStatus || "UPCOMING"}
+                </span>
               </div>
-            ) : (
-              cancelledEvents.map((event) => renderEventCard(event, { isCancelledList: true }))
-            )}
-          </>
+
+              <div
+                style={{
+                  display: "flex",
+                  gap: "0.75rem",
+                  flexWrap: "wrap",
+                  marginTop: "1rem",
+                }}
+              >
+                <button onClick={() => handleEditEvent(event.eventId)}>
+                  Edit Event
+                </button>
+
+                {event.hasSeats && (
+                  <button onClick={() => handleManageSeats(event.eventId)}>
+                    Manage Seats
+                  </button>
+                )}
+
+                <button
+                  onClick={() => handleDelete(event.eventId)}
+                  style={{ backgroundColor: "#c62828", color: "white" }}
+                >
+                  Delete Event
+                </button>
+              </div>
+            </div>
+          ))
         )}
       </div>
     </>
