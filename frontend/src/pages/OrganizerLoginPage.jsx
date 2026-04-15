@@ -3,55 +3,77 @@ import { useNavigate } from "react-router-dom";
 import { loginUser } from "../services/authService";
 import Navbar from "../components/Navbar";
 
-const EMAIL_REGEX = /^[a-z0-9]+@[a-z0-9.-]+\.[a-z]{2,}$/;
-
 function OrganizerLoginPage() {
-  const [form, setForm] = useState({ email: "", password: "" });
+  const [form, setForm] = useState({
+    email: "",
+    password: "",
+    role: "ORGANIZER",
+  });
   const [errorMsg, setErrorMsg] = useState("");
+  const [loading, setLoading] = useState(false);
+
   const navigate = useNavigate();
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    const nextValue =
-      name === "email" ? value.toLowerCase().replace(/\s+/g, "") : value;
-
     setErrorMsg("");
-    setForm({ ...form, [name]: nextValue });
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const clearSession = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("role");
+    localStorage.removeItem("email");
+    localStorage.removeItem("userId");
+    localStorage.removeItem("userCode");
+    localStorage.removeItem("accountStatus");
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const normalizedEmail = form.email.toLowerCase().trim();
-
-    if (!EMAIL_REGEX.test(normalizedEmail)) {
-      setErrorMsg("Use a valid lowercase email address.");
-      return;
-    }
+    setErrorMsg("");
+    setLoading(true);
 
     try {
-      const response = await loginUser({
-        ...form,
-        email: normalizedEmail,
-        role: "ORGANIZER",
-      });
-      const token = response?.token || response?.accessToken || response?.jwt;
-      if (!token) {
-        setErrorMsg("Login response is missing token. Please try again.");
+      const response = await loginUser(form);
+
+      if (!response?.token) {
+        throw new Error("Token not received from server");
+      }
+
+      const role = response.role?.toUpperCase();
+
+      if (role !== "ORGANIZER" && role !== "ROLE_ORGANIZER") {
+        clearSession();
+        setErrorMsg("This account is not an organizer account.");
+        setLoading(false);
         return;
       }
 
-      localStorage.setItem("token", token);
-      localStorage.setItem("role", response?.role || "");
-      localStorage.setItem("email", response?.email || "");
-
-      if (response.role === "ORGANIZER" || response.role === "ROLE_ORGANIZER") {
-        navigate("/organizer/dashboard");
-      } else {
-        setErrorMsg("This account is not an organizer account.");
+      if (response.accountStatus && response.accountStatus.toUpperCase() !== "ACTIVE") {
+        clearSession();
+        setErrorMsg("Your account is not active.");
+        setLoading(false);
+        return;
       }
+
+      localStorage.setItem("token", response.token);
+      localStorage.setItem("role", response.role || "ORGANIZER");
+      localStorage.setItem("email", response.email || "");
+      localStorage.setItem("userId", response.userId ?? "");
+      localStorage.setItem("userCode", response.userCode ?? "");
+      localStorage.setItem("accountStatus", response.accountStatus ?? "ACTIVE");
+
+      navigate("/organizer/dashboard");
     } catch (error) {
-      console.error(error);
-      setErrorMsg(error.response?.data || error.message || "Login failed");
+      console.error("Organizer login failed:", error);
+      setErrorMsg(
+        error.response?.data?.message ||
+          error.response?.data ||
+          error.message ||
+          "Organizer login failed"
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -72,8 +94,6 @@ function OrganizerLoginPage() {
               placeholder="Email"
               value={form.email}
               onChange={handleChange}
-              pattern="[a-z0-9]+@[a-z0-9.-]+\.[a-z]{2,}"
-              title="Use lowercase letters and numbers before @ (example: user123@mail.com)."
               required
             />
             <input
@@ -84,7 +104,9 @@ function OrganizerLoginPage() {
               onChange={handleChange}
               required
             />
-            <button type="submit">Login</button>
+            <button type="submit" disabled={loading}>
+              {loading ? "Logging in..." : "Login"}
+            </button>
           </form>
         </div>
       </div>
