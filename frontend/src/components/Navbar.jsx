@@ -14,7 +14,7 @@ function Navbar() {
   return (
     <div className="navbar">
       <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
-        <div className="logo">🎟 Event Booking</div>
+        <div className="logo">🎫 Event Booking</div>
 
         <Link to="/">Home</Link>
 
