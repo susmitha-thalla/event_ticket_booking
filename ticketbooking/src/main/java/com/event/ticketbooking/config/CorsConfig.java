@@ -19,7 +19,7 @@ public class CorsConfig {
                 "http://localhost:5173",
                 "http://localhost:*",
                 "https://event-ticket-booking-olive.vercel.app",
-                "https://event-ticket-booking-eight.vercel.app","postgresql://ticketbookingdb_bles_user:VoG2lnT6Z5xjDBHewQL8A06uM95hPqKa@dpg-d9mpsom1egvs73en5nqg-a/ticketbookingdb_bles"
+                "https://event-ticket-booking-eight.vercel.app"
         ));
 
         configuration.setAllowedMethods(List.of(
