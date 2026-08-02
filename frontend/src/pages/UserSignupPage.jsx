@@ -91,8 +91,11 @@ function UserSignupPage() {
       navigate("/events");
     } catch (error) {
       console.error(error);
+      const err = error.response?.data;
       setErrorMsg(
-        error.response?.data || error.message || "Signup failed"
+       typeof err === "string"
+    ? err
+    : err?.message || error.message || "Something went wrong SignUp failed, please try again."
       );
     }
   };

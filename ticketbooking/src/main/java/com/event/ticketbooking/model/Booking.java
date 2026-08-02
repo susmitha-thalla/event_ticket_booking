@@ -42,7 +42,7 @@ public class Booking {
     private String qrCode;
 
     @Lob
-    @Column(name = "qr_image_path", columnDefinition = "LONGTEXT")
+    @Column(name = "qr_image_path", columnDefinition = "TEXT")
     private String qrImagePath;
 
     @Column(name = "payment_mode", length = 50)
