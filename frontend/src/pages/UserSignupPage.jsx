@@ -114,7 +114,7 @@ function UserSignupPage() {
               placeholder="Full Name"
               value={form.fullName}
               onChange={handleChange}
-              pattern="[A-Za-z ]+"
+              pattern="[A-Za-z]+"
               title="Only letters and spaces are allowed."
               required
             />
@@ -124,7 +124,7 @@ function UserSignupPage() {
               placeholder="Email"
               value={form.email}
               onChange={handleChange}
-              pattern="[a-z0-9]+@[a-z0-9.-]+\.[a-z]{2,}"
+              pattern="[a-z0-9]+@[a-z0-9.-]+[.][a-z]{2,}"
               title="Use lowercase letters and numbers before @ (example: user123@mail.com)."
               required
             />
