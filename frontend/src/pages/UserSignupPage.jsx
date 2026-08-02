@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { loginUser, registerUser } from "../services/authService";
 import Navbar from "../components/Navbar";
 
-const EMAIL_REGEX = /^[a-z0-9]+@[a-z0-9.-]+\.[a-z]{2,}$/;
+const EMAIL_REGEX = /^[a-z0-9]+@[a-z0-9.\-]+\.[a-z]{2,}$/;
 const NAME_REGEX = /^[A-Za-z ]+$/;
 
 function UserSignupPage() {
