@@ -2,6 +2,7 @@ package com.event.ticketbooking.security;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security. Keys;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -19,7 +20,10 @@ public class JwtUtil {
 
     @Value("${app.jwt.expiration}")
     private long expiration;
-
+    @PostConstruct
+    public void checkSecret() {
+        System.out.println("JWT Secret Length = " + secret.length());
+    }
     private Key getSigningKey() {
         return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
